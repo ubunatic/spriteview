@@ -2,6 +2,9 @@
 
 Modern GNOME Files (Nautilus) Python extension for Ubuntu 26.04 LTS ("resolute").
 
+![Nautilus SpriteView Menu](website/assets/spriteview-menu.png)
+![Nautilus SpriteView Player](website/assets/spriteview-player.png)
+
 This plugin adds a `"Preview Image"` (or `"Preview Sprite Sheet"`) action to the right-click context menu of image files (`.png`, `.gif`, `.bmp`, `.jpg`, `.jpeg`, `.webp`). When activated, it opens a custom split-pane GTK4 window to preview the image:
 *   **Crisp Scaling**: Small pixel-art/PNG/GIF/BMP images undergo nearest-neighbor (point) integer upscaling beforehand. This ensures they are rendered with crisp, sharp pixels rather than a blurry filter when scaled to fit the window.
 *   **Properties Panel**: A dedicated sidebar displays metadata properties (filename, original dimensions, file size, frame count).
@@ -9,12 +12,22 @@ This plugin adds a `"Preview Image"` (or `"Preview Sprite Sheet"`) action to the
 *   **Interactive Color Info**: Clicking on any color swatch reveals a details panel in the sidebar showing its visual representation, closest ANSI 256 color index/name (determined by Euclidean distance), shorthand hex format (`#fff`), full hex (including alpha transparency if present), and RGBA formats.
 *   **Playback Controls**: For sprite sequences (`_0001.png`), it provides animation controls (Play, Pause, Step Next, Step Prev), a clickable visual frame thumbnail strip, a **dynamic FPS (Frames Per Second) speed control** (using a `Gtk.SpinButton` from `1` to `60` FPS), and **multiple playback modes** (Loop, Ping-Pong, and Once via a modern GTK4 `Gtk.DropDown` selector).
 
-## Prerequisites
+## Installation
+
+### 1. Prerequisites
 
 Ensure you have the Python 3 bindings for Nautilus components installed:
 
 ```bash
 sudo apt install python3-nautilus
+```
+
+### 2. Install the Plugin
+
+You can install the plugin with a single command:
+
+```bash
+curl -sSL https://codeberg.org/nautilus-spriteview/raw/branch/main/scripts/install.sh | bash
 ```
 
 ## Make Targets

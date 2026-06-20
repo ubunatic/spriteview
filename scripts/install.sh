@@ -21,9 +21,16 @@ then pass "Created target extension directory"
 else fail "Could not create directory: $user_ext_dir"
 fi
 
-if cp "$extension_name" "$user_ext_dir/$extension_name"
-then pass "Copied $extension_name to $user_ext_dir"
-else fail "Could not copy $extension_name to $user_ext_dir"
+if test -f "$extension_name"
+then if cp "$extension_name" "$user_ext_dir/$extension_name"
+     then pass "Copied $extension_name to $user_ext_dir"
+     else fail "Could not copy $extension_name to $user_ext_dir"
+     fi
+else printf 'Downloading %s from Codeberg...\n' "$extension_name" >&2
+     if curl -sSL -o "$user_ext_dir/$extension_name" "https://codeberg.org/nautilus-spriteview/raw/branch/main/nautilus_preview.py"
+     then pass "Downloaded and installed $extension_name"
+     else fail "Could not download $extension_name from Codeberg"
+     fi
 fi
 
 printf 'Restarting Nautilus...\n' >&2
