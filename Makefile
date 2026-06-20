@@ -12,6 +12,9 @@ open:
 	# open real project
 	open ~/projects/emojig/spec/art/about/
 
+browse: ⚙️ ## open website in browser
+	open website/index.html
+
 test: ⚙️  ## run syntax check on the Python extension
 	python3 -m py_compile $(EXTENSION_NAME)
 	@echo "✅ Extension syntax check passed"

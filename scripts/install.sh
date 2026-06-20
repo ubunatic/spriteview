@@ -16,6 +16,23 @@ fail() {
 extension_name="nautilus_preview.py"
 user_ext_dir="${HOME}/.local/share/nautilus-python/extensions"
 
+if dpkg-query -W -f='${Status}' python3-nautilus 2>/dev/null | grep -q "ok installed"
+then pass "python3-nautilus is installed"
+else printf 'python3-nautilus is required but not installed.\n' >&2
+     printf 'Would you like to install it now using sudo apt install? [y/N]: ' >&2
+     read -r response
+     if test "$response" = "y" ||
+        test "$response" = "Y"
+     then printf 'Running: sudo apt update && sudo apt install -y python3-nautilus...\n' >&2
+          if sudo apt update &&
+             sudo apt install -y python3-nautilus
+          then pass "Successfully installed python3-nautilus"
+          else fail "Failed to install python3-nautilus"
+          fi
+     else fail "python3-nautilus is required to run the extension. Installation aborted."
+     fi
+fi
+
 if mkdir -p "$user_ext_dir"
 then pass "Created target extension directory"
 else fail "Could not create directory: $user_ext_dir"
