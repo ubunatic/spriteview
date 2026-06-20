@@ -425,7 +425,7 @@ class ImagePreviewWindow(Gtk.Window):
         fps_lbl = Gtk.Label(label="FPS:")
         settings_box.append(fps_lbl)
         
-        adj = Gtk.Adjustment(value=6.0, lower=1.0, upper=60.0, step_increment=1.0, page_increment=5.0, page_size=0.0)
+        adj = Gtk.Adjustment(value=15.0, lower=1.0, upper=60.0, step_increment=1.0, page_increment=5.0, page_size=0.0)
         self.fps_spin = Gtk.SpinButton(adjustment=adj, climb_rate=1.0, digits=0)
         self.fps_spin.connect("value-changed", self._on_fps_changed)
         settings_box.append(self.fps_spin)
