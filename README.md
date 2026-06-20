@@ -25,7 +25,7 @@ This project features a self-documenting Makefile conforming to our Make convent
 $ make
   help          show this help
   test          run syntax check on the Python extension
-  test-sprites  generate test sprite files (sprite_0001.png to sprite_0004.png)
+  test-sprites  generate test sprite files (sprites/sprite_0001.png to sprites/sprite_0004.png)
   install       install the extension and restart Nautilus
   uninstall     uninstall the extension and restart Nautilus
   restart       restart Nautilus to apply changes
