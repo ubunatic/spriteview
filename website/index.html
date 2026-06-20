@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nautilus SpriteView — Modern GNOME Files Sprite Sheet Previewer</title>
+    <!-- Adwaita / GNOME inspired styling -->
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --card-bg: #2d2d2d;
+            --border-color: #3f3f3f;
+            --accent-color: #3584e4;
+            --accent-hover: #1c71d8;
+            --text-main: #f6f5f4;
+            --text-muted: #c0bfbc;
+            --success-color: #2ec27e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding-bottom: 4rem;
+        }
+
+        header {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 4rem 2rem 2rem 2rem;
+            text-align: center;
+        }
+
+        .logo-area {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .logo-icon {
+            font-size: 2.5rem;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, #fff 30%, var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 1.35rem;
+            color: var(--text-muted);
+            max-width: 700px;
+            margin: 0 auto 2.5rem auto;
+            font-weight: 400;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 3rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.8rem 1.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: var(--text-muted);
+        }
+
+        /* Hero Screenshots */
+        .showcase {
+            max-width: 1100px;
+            margin: 0 auto 5rem auto;
+            padding: 0 2rem;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .showcase {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .screenshot-container {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            background-color: #121212;
+            transition: transform 0.3s ease;
+        }
+
+        .screenshot-container:hover {
+            transform: translateY(-4px);
+        }
+
+        .screenshot-container img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        /* Quick Install Box */
+        .quick-install {
+            background-color: #151515;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 650px;
+            margin: 0 auto 5rem auto;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.95rem;
+            gap: 1rem;
+        }
+
+        .command-text {
+            color: var(--success-color);
+            overflow-x: auto;
+            white-space: nowrap;
+            scrollbar-width: none;
+        }
+
+        .command-text::before {
+            content: "$ ";
+            color: #888;
+            user-select: none;
+        }
+
+        .copy-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-btn:hover {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Features Section */
+        .features-section {
+            max-width: 1100px;
+            margin: 0 auto 5rem auto;
+            padding: 0 2rem;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 3rem;
+            font-weight: 700;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            transition: all 0.2s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 10px 20px rgba(53, 132, 228, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+
+        .feature-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Installation Details */
+        .install-section {
+            background-color: #121212;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 5rem 2rem;
+        }
+
+        .install-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 2.5rem;
+            margin-top: 2rem;
+        }
+
+        .step {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .step-num {
+            background-color: var(--accent-color);
+            color: white;
+            font-weight: 800;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 0.2rem;
+        }
+
+        .step-content h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .step-content p {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .code-block {
+            background-color: #1e1e1e;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9rem;
+            color: #e5e5e5;
+            position: relative;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding-top: 4rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--text-muted);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            color: var(--accent-color);
+        }
+
+        /* Copy confirmation tooltip */
+        .tooltip {
+            position: relative;
+        }
+        .tooltip::after {
+            content: "Copied!";
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            background-color: var(--success-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            pointer-events: none;
+            white-space: nowrap;
+            font-family: sans-serif;
+        }
+        .tooltip.show::after {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-4px);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <span class="logo-icon">🖼️</span>
+            <h1>Nautilus SpriteView</h1>
+        </div>
+        <p class="subtitle">Modern GNOME Files Python extension for Ubuntu 26.04 LTS ("resolute") to preview pixel art, image assets, and animated sprite sequences instantly.</p>
+        
+        <div class="cta-buttons">
+            <a href="#install" class="btn btn-primary">Get Started</a>
+            <a href="https://codeberg.org/nautilus-spriteview" class="btn btn-secondary" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="display:inline-block;vertical-align:middle;margin-top:-2px">
+                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+                Codeberg Repository
+            </a>
+        </div>
+    </header>
+
+    <div class="showcase">
+        <div class="screenshot-container">
+            <img src="assets/spriteview-menu.png" alt="Context Menu Option in Nautilus">
+        </div>
+        <div class="screenshot-container">
+            <img src="assets/spriteview-player.png" alt="SpriteView Player and Metadata Inspector Window">
+        </div>
+    </div>
+
+    <div class="quick-install">
+        <div class="command-text" id="install-command">curl -sSL https://codeberg.org/nautilus-spriteview/raw/branch/main/scripts/install.sh | bash</div>
+        <button class="copy-btn" id="copy-button" aria-label="Copy install command">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+        </button>
+    </div>
+
+    <section class="features-section">
+        <h2 class="section-title">Key Features</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <span class="feature-icon">🔍</span>
+                <h3>Crisp Nearest-Neighbor Scaling</h3>
+                <p>Perfect for pixel art! Small PNG, GIF, BMP, and WebP images are scaled using crisp, sharp point filtering to preserve individual pixels instead of showing blurry, smooth artifacts.</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">📊</span>
+                <h3>Properties Panel</h3>
+                <p>A dedicated sidebar displays metadata properties such as filename, original dimensions, file size, and the number of active animation frames.</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🎨</span>
+                <h3>Color Palette Extractor</h3>
+                <p>Instantly extracts the top 16 most common colors in the active frame. Swatch widgets are recycled dynamically to preserve tooltips even while sprite animations are playing.</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">💡</span>
+                <h3>Interactive Color Inspector</h3>
+                <p>Clicking any palette swatch reveals details in the sidebar showing its exact closest ANSI 256 color name/index, hex format (with transparency if present), and full RGBA values.</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🕹️</span>
+                <h3>Sprite Sequences Playback</h3>
+                <p>Provides complete animation controls (Play, Pause, Step Next, Step Prev) and a clickable visual frame thumbnail strip for sprite sheet sequences (`_0001.png` files).</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">⚙️</span>
+                <h3>Dynamic FPS & Modes</h3>
+                <p>Adjust speeds on the fly with a GTK4 SpinButton ranging from 1 to 60 FPS (defaulting to 15 FPS) and select between Loop, Ping-Pong, and Play Once playback modes.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="install-section" id="install">
+        <div class="install-container">
+            <h2 class="section-title">Installation Guide</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-content">
+                        <h3>Install Prerequisites</h3>
+                        <p>First, ensure you have the Python 3 bindings for Nautilus components installed on your system:</p>
+                        <div class="code-block">sudo apt install python3-nautilus</div>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-content">
+                        <h3>Run the One-Line Installer</h3>
+                        <p>Execute this command to download the extension, copy it to the local extensions directory, and automatically restart Nautilus to load the plugin:</p>
+                        <div class="code-block">curl -sSL https://codeberg.org/nautilus-spriteview/raw/branch/main/scripts/install.sh | bash</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>Released under the <a href="https://codeberg.org/nautilus-spriteview" target="_blank">AGPL 3.0 License</a>. Made with ❤️ for GNOME & pixel art creators.</p>
+    </footer>
+
+    <script>
+        const copyButton = document.getElementById('copy-button');
+        const installCommand = document.getElementById('install-command');
+
+        copyButton.addEventListener('click', () => {
+            navigator.clipboard.writeText(installCommand.textContent).then(() => {
+                copyButton.classList.add('tooltip', 'show');
+                setTimeout(() => {
+                    copyButton.classList.remove('show');
+                    // wait for transition to complete before removing the class entirely
+                    setTimeout(() => copyButton.classList.remove('tooltip'), 200);
+                }, 1500);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        });
+    </script>
+</body>
+</html>
