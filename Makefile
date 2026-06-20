@@ -21,9 +21,7 @@ test: ⚙️  ## run syntax check on the Python extension
 
 test-sprites: ⚙️  ## generate test sprite files (sprites/sprite_0001.png to sprites/sprite_0004.png)
 	@mkdir -p sprites
-	python3 -c "import gi; gi.require_version('GdkPixbuf', '2.0'); from gi.repository import GdkPixbuf; \
-	[ (p.fill(c), p.savev(f'sprites/sprite_{i+1:04d}.png', 'png', [], [])) for i, c in enumerate([0xff0000ff, 0x00ff00ff, 0x0000ffff, 0xffff00ff]) for p in [GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, 16, 16)] ]"
-	@echo "✅ Generated test sprite files: sprites/sprite_0001.png to sprites/sprite_0004.png"
+	@python3 scripts/generate_sprites.py
 
 install: ⚙️ test  ## install the extension and restart Nautilus
 	@chmod +x $(INSTALL_SCRIPT)
