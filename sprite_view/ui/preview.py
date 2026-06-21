@@ -22,6 +22,93 @@ from sprite_view.ui.settings import SettingsWindow
 
 _ALIGN_LABELS = ["↖", "↑", "↗", "←", "·", "→", "↙", "↓", "↘"]
 
+
+class WindowManager:
+    """
+    Centralized registry managing window lifecycles, child dependencies,
+    and automatic transient parent resolution.
+    """
+    _active_parents = []
+    _dependent_map = {}  # parent_id -> list of dependent windows
+    _singletons = {}     # type_name -> window instance
+
+    @classmethod
+    def register_parent(cls, parent_win: Gtk.Window) -> None:
+        if parent_win not in cls._active_parents:
+            cls._active_parents.append(parent_win)
+            cls._dependent_map[id(parent_win)] = []
+            parent_win.connect("destroy", cls._on_parent_destroyed)
+
+    @classmethod
+    def register_dependent(cls, parent_win: Gtk.Window, child_win: Gtk.Window) -> None:
+        cls.register_parent(parent_win)  # Ensure parent is tracked
+        child_win.set_transient_for(parent_win)
+        cls._dependent_map[id(parent_win)].append(child_win)
+        child_win.connect("destroy", lambda w: cls._on_dependent_destroyed(parent_win, w))
+
+    @classmethod
+    def get_dependent(cls, parent_win: Gtk.Window, child_class) -> Gtk.Window:
+        parent_id = id(parent_win)
+        cls.register_parent(parent_win)  # Ensure parent is tracked
+        
+        for child in cls._dependent_map.get(parent_id, []):
+            if isinstance(child, child_class):
+                child.present()
+                return child
+                
+        win = child_class(parent_win)
+        cls._dependent_map[parent_id].append(win)
+        win.connect("destroy", lambda w: cls._on_dependent_destroyed(parent_win, w))
+        win.present()
+        return win
+
+    @classmethod
+    def get_singleton(cls, singleton_class, parent_win: Gtk.Window) -> Gtk.Window:
+        name = singleton_class.__name__
+        if name not in cls._singletons or cls._singletons[name] is None:
+            # Instantiate singleton
+            win = singleton_class(parent_win)
+            cls._singletons[name] = win
+            win.connect("destroy", lambda w: cls._on_singleton_destroyed(name))
+        else:
+            win = cls._singletons[name]
+            win.set_transient_for(parent_win)
+            win.present()
+        return win
+
+    @classmethod
+    def _on_parent_destroyed(cls, parent_win: Gtk.Window) -> None:
+        parent_id = id(parent_win)
+        
+        # 1. Sweep and destroy all dependent child windows
+        if parent_id in cls._dependent_map:
+            for child in list(cls._dependent_map[parent_id]):
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
+            del cls._dependent_map[parent_id]
+            
+        # 2. Remove from active parents
+        if parent_win in cls._active_parents:
+            cls._active_parents.remove(parent_win)
+            
+        # 3. Resolve transient re-parenting for singletons
+        next_parent = cls._active_parents[0] if cls._active_parents else None
+        for name, win in cls._singletons.items():
+            if win is not None and win.get_transient_for() is parent_win:
+                win.set_transient_for(next_parent)
+
+    @classmethod
+    def _on_dependent_destroyed(cls, parent_win: Gtk.Window, child_win: Gtk.Window) -> None:
+        parent_id = id(parent_win)
+        if parent_id in cls._dependent_map and child_win in cls._dependent_map[parent_id]:
+            cls._dependent_map[parent_id].remove(child_win)
+
+    @classmethod
+    def _on_singleton_destroyed(cls, name: str) -> None:
+        cls._singletons[name] = None
+
 def init_css():
     display = Gdk.Display.get_default()
     if display:
@@ -58,9 +145,6 @@ class SelectableLabel(Gtk.Label):
         self.set_focusable(False)
 
 class ImagePreviewWindow(Gtk.Window):
-    _active_instances = []
-    _shared_settings_win = None
-    _shared_about_win = None
 
     def __init__(self, file_paths: List[str], selected_file_path: str, title: str) -> None:
         super().__init__(title=title)
@@ -69,8 +153,8 @@ class ImagePreviewWindow(Gtk.Window):
         # Initialize style provider
         init_css()
 
-        self._dependent_windows = []
-        ImagePreviewWindow._active_instances.append(self)
+        # Register parent window with central WindowManager
+        WindowManager.register_parent(self)
 
         self.file_paths = file_paths
         self.first_frame_path = file_paths[0] if file_paths else ""
@@ -569,29 +653,6 @@ class ImagePreviewWindow(Gtk.Window):
             GLib.source_remove(self.timer_id)
             self.timer_id = None
 
-        # 1. Destroy all registered dependent instance windows
-        for win in list(self._dependent_windows):
-            try:
-                win.destroy()
-            except Exception:
-                pass
-        self._dependent_windows.clear()
-
-        # Remove self from active instances
-        if self in ImagePreviewWindow._active_instances:
-            ImagePreviewWindow._active_instances.remove(self)
-
-        # 2. Transfer shared singleton windows to another active parent (if any)
-        other_parent = None
-        for inst in ImagePreviewWindow._active_instances:
-            if inst is not self:
-                other_parent = inst
-                break
-
-        for win in (ImagePreviewWindow._shared_settings_win, ImagePreviewWindow._shared_about_win):
-            if win is not None and win.get_transient_for() is self:
-                win.set_transient_for(other_parent)
-
     def _on_fps_changed(self, spin_button) -> None:
         fps = spin_button.get_value()
         interval_ms = int(1000.0 / fps)
@@ -608,28 +669,12 @@ class ImagePreviewWindow(Gtk.Window):
             save_settings(self.settings)
 
     def _on_settings_clicked(self, button, popover) -> None:
-        if ImagePreviewWindow._shared_settings_win is not None:
-            ImagePreviewWindow._shared_settings_win.present()
-            popover.popdown()
-            return
         popover.popdown()
-        ImagePreviewWindow._shared_settings_win = SettingsWindow(self)
-        ImagePreviewWindow._shared_settings_win.connect(
-            "destroy", lambda w: setattr(ImagePreviewWindow, "_shared_settings_win", None)
-        )
-        ImagePreviewWindow._shared_settings_win.present()
+        WindowManager.get_singleton(SettingsWindow, self)
 
     def _on_about_clicked(self, button, popover) -> None:
-        if ImagePreviewWindow._shared_about_win is not None:
-            ImagePreviewWindow._shared_about_win.present()
-            popover.popdown()
-            return
         popover.popdown()
-        ImagePreviewWindow._shared_about_win = AboutWindow(self)
-        ImagePreviewWindow._shared_about_win.connect(
-            "destroy", lambda w: setattr(ImagePreviewWindow, "_shared_about_win", None)
-        )
-        ImagePreviewWindow._shared_about_win.present()
+        WindowManager.get_singleton(AboutWindow, self)
 
     def _on_mode_changed(self, dropdown, pspec) -> None:
         self.play_direction = 1
@@ -1031,16 +1076,8 @@ class ImagePreviewWindow(Gtk.Window):
         self._export_image_to(default_name, "webm", save_webm)
 
     def _on_export_adv_clicked(self, button, popover) -> None:
-        if hasattr(self, "_export_adv_win") and self._export_adv_win is not None:
-            self._export_adv_win.present()
-            popover.popdown()
-            return
         popover.popdown()
-        self._export_adv_win = ExportOptionsWindow(self)
-        self._export_adv_win.connect(
-            "destroy", lambda w: setattr(self, "_export_adv_win", None)
-        )
-        self._export_adv_win.present()
+        WindowManager.get_dependent(self, ExportOptionsWindow)
 
     def present(self) -> None:
         super().present()
@@ -1055,25 +1092,10 @@ class ImagePreviewWindow(Gtk.Window):
         return False
 
 
-class DependentWindow(Gtk.Window):
-    def __init__(self, parent_win, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.set_transient_for(parent_win)
-        
-        # Register with parent preview window
-        if hasattr(parent_win, "_dependent_windows"):
-            parent_win._dependent_windows.append(self)
-            
-        self.connect("destroy", self._on_dependent_destroy, parent_win)
-        
-    def _on_dependent_destroy(self, widget, parent_win) -> None:
-        if hasattr(parent_win, "_dependent_windows") and self in parent_win._dependent_windows:
-            parent_win._dependent_windows.remove(self)
-
-
-class ExportOptionsWindow(DependentWindow):
+class ExportOptionsWindow(Gtk.Window):
     def __init__(self, parent_win) -> None:
-        super().__init__(parent_win, title="Advanced Export Options")
+        super().__init__(title="Advanced Export Options")
+        self.set_transient_for(parent_win)
         self.set_default_size(360, 440)
         self.parent_win = parent_win
 
