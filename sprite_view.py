@@ -309,6 +309,10 @@ class AboutWindow(Gtk.AboutDialog):
         self.set_website("https://github.com/ubunatic/nautilus")
         self.set_copyright("© 2026 Uwe Jugel")
         self.set_license_type(Gtk.License.AGPL_3_0_ONLY)
+        
+        # Set the logo to show sprite 1 (the first frame)
+        if hasattr(parent_win, "textures") and parent_win.textures:
+            self.set_logo(parent_win.textures[0])
 
 
 class ImagePreviewWindow(Gtk.Window):
