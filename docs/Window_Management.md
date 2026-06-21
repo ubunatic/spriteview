@@ -135,3 +135,23 @@ To prevent transient child windows from entering invalid hidden/partially-destro
 2. **Automatic Safety Nets**: If a developer forgets to clean up a child window, the `WindowManager` automatically sweeps and destroys it when the parent terminates.
 3. **Thread and ID Safety**: Uses standard object IDs (`id(parent_win)`) to safely index tracking slots even if parent window references are cleared out of sequence.
 4. **Uniform Pattern**: Provides a single API (`WindowManager.get_singleton(...)` and `WindowManager.register_dependent(...)`) for creating any dialogs in the application.
+
+---
+
+## 5. Startup Mapping Race Condition for Transient Windows
+
+### The Problem
+When presenting a transient child window (using `set_transient_for(parent_win)`) immediately upon application startup:
+* The parent window is instantiated and `.present()` is called, but it has not been fully mapped, sized, or positioned by the window manager/Wayland compositor yet.
+* Because the parent has no allocated screen coordinates at mapping time, calling `.present()` on the child window immediately afterwards causes it to position relative to `(0, 0)` (often placing it partially offscreen at the top-left).
+
+### The Solution
+Delay presenting the transient child window by a brief timeout (e.g. 100ms) to allow the parent window to map and obtain coordinates first:
+```python
+            if args.export and args.export.lower() == "choose":
+                def launch_export_dialog():
+                    WindowManager.get_dependent(win, ExportOptionsWindow)
+                    return False  # Run only once
+                GLib.timeout_add(100, launch_export_dialog)
+```
+During unit testing, mock/patch `GLib.timeout_add` to execute the callback synchronously to prevent test cases from finishing before the child window is registered.

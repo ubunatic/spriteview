@@ -41,6 +41,19 @@ For each file in the compilation list, `pack.py`:
 4. Generates a unified, single global header with all required third-party imports and specific `gi.require_version` constraints.
 5. Inlines the remaining functions and classes into the target file `dist/sprite_view.py`.
 
+### Resilient Conditional Imports
+
+Because the pipeline actively strips statements starting with `from gi.repository` or `gi.require_version` to prevent duplicates:
+* **Gotcha**: If you write local `try/except` imports or version constraints (e.g., trying to conditionally import `Nautilus` only when running as a Nautilus extension), the compiler will strip those lines and leave empty `try` blocks, leading to `IndentationError`.
+* **Resilient Pattern**: Bypass string-based line stripping by using dynamic references or `__import__`:
+  ```python
+  # Dynamic version demand:
+  getattr(gi, 'require_version')('Nautilus', '4.0')
+
+  # Dynamic import:
+  Nautilus = __import__('gi.repository', fromlist=['Nautilus']).Nautilus
+  ```
+
 ---
 
 ## Makefile Integration
