@@ -16,15 +16,16 @@ def find_sprite_frames(file_path: str) -> List[str]:
     dir_name = os.path.dirname(file_path)
     base_name = os.path.basename(file_path)
     
-    # Matches patterns like prefix_0001.png or prefix_0001.gif
-    match = re.match(r"^(.*)_([0-9]{4})\.(png|gif|bmp|jpg|jpeg|webp)$", base_name, re.IGNORECASE)
+    # Matches patterns like prefix_0001.png, prefix_001.png, prefix_01.png
+    match = re.match(r"^(.*)_([0-9]{2,4})\.(png|gif|bmp|jpg|jpeg|webp)$", base_name, re.IGNORECASE)
     if not match:
         return [file_path]
-        
+
     prefix = match.group(1)
     ext = match.group(3)
-    
-    pattern = re.compile(rf"^{re.escape(prefix)}_([0-9]{{4}})\.{ext}$", re.IGNORECASE)
+    digit_len = len(match.group(2))
+
+    pattern = re.compile(rf"^{re.escape(prefix)}_([0-9]{{{digit_len}}})\.{ext}$", re.IGNORECASE)
     
     frames = []
     try:

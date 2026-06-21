@@ -36,6 +36,42 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(frames[2], "/path/to/dir/sprite_0003.png")
 
     @patch("os.listdir")
+    def test_find_sprite_frames_matched_3digit(self, mock_listdir):
+        mock_listdir.return_value = [
+            "sprite_001.png",
+            "sprite_002.png",
+            "sprite_003.png",
+            "other_file.png",
+        ]
+        frames = find_sprite_frames("/path/to/dir/sprite_002.png")
+        self.assertEqual(len(frames), 3)
+        self.assertEqual(frames[0], "/path/to/dir/sprite_001.png")
+        self.assertEqual(frames[2], "/path/to/dir/sprite_003.png")
+
+    @patch("os.listdir")
+    def test_find_sprite_frames_matched_2digit(self, mock_listdir):
+        mock_listdir.return_value = [
+            "sprite_01.png",
+            "sprite_02.png",
+            "sprite_03.png",
+            "other_file.png",
+        ]
+        frames = find_sprite_frames("/path/to/dir/sprite_02.png")
+        self.assertEqual(len(frames), 3)
+        self.assertEqual(frames[0], "/path/to/dir/sprite_01.png")
+        self.assertEqual(frames[2], "/path/to/dir/sprite_03.png")
+
+    @patch("os.listdir")
+    def test_find_sprite_frames_no_cross_digit_match(self, mock_listdir):
+        # 3-digit input should not match 4-digit files
+        mock_listdir.return_value = [
+            "sprite_0001.png",
+            "sprite_0002.png",
+        ]
+        frames = find_sprite_frames("/path/to/dir/sprite_001.png")
+        self.assertEqual(frames, ["/path/to/dir/sprite_001.png"])
+
+    @patch("os.listdir")
     def test_find_sprite_frames_no_match(self, mock_listdir):
         mock_listdir.return_value = [
             "sprite_0001.png",
