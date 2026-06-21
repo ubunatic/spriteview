@@ -11,7 +11,11 @@ open: ⚙️  ## open sprites dir using "open"
 	open sprites
 
 nautilus: ⚙️  ## open sprites dir using "nautilus" directly
-	nautilus --no-desktop sprites
+	@orig_size=$$(gsettings get org.gnome.nautilus.window-state initial-size) && \
+	gsettings set org.gnome.nautilus.window-state initial-size '(600, 400)' && \
+	nautilus --no-desktop sprites & \
+	sleep 1.5 && \
+	gsettings set org.gnome.nautilus.window-state initial-size "$$orig_size"
 
 dev: ⚙️test install nautilus
 
