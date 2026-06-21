@@ -301,7 +301,7 @@ class SettingsWindow(Gtk.Window):
 EMBEDDED_LOGO_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAATBJREFUS"
     "IntlDFqwzAYhT/XXpvEJCAMgUKHjF26d8qQpVv2jjmAz9EDpGfI1iVDL5AbFA+FQsEYYlyaK"
-    "YNxh1ZGliUnwYZSyLdYEvZ7kv+nHxSuLm8KWqJrXLQVPMT/N3AArsV9kc4mnQoP1xFvybPgA"
+    "YNxh1ZGliUnwYZSyLdYEvZ7kv+nHxSuLm8KWqJrXLQVPMT/N3AArsV9kc4mnQoP1xFvybPjA"
     "aSzCcN1RO4HnYi7WfyjlYAnF3M/gLvbTgzSfcRgswMMNZgvR8yXo9pYhAIRinIM0JuOy+960"
     "3FlLjEWebXYGneWPCaVp25iomawWmzLXduQJwD4evkwjq0GurjtNBL9N+k4AP2HsBhsdp0V+"
     "fO3yO+vT87f3WQ1SUAlQbYUnWSgoybnFI42UJOjx7QpqlYDGVdTiqTZoYiC0ipsJhLTJWsSr"
@@ -316,7 +316,9 @@ def get_embedded_logo() -> Gdk.Texture:
         loader.write(img_data)
         loader.close()
         pixbuf = loader.get_pixbuf()
-        return Gdk.Texture.new_for_pixbuf(pixbuf)
+        # Scale up using nearest-neighbor to prevent blurriness
+        scaled_pixbuf = pixbuf.scale_simple(128, 128, GdkPixbuf.InterpType.NEAREST)
+        return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
     except Exception as e:
         print(f"Error loading embedded logo: {e}")
         return None
@@ -338,6 +340,29 @@ class AboutWindow(Gtk.AboutDialog):
         logo_texture = get_embedded_logo()
         if logo_texture:
             self.set_logo(logo_texture)
+
+        # Prevent plain text labels and links from being automatically focused/text-selected on open
+        def prevent_label_selection(widget):
+            if isinstance(widget, Gtk.Label):
+                text = widget.get_text()
+                if text in ["Nautilus Sprite View", "1.0.0", "© 2026 Uwe Jugel", "Website", "https://github.com/ubunatic/nautilus"] or "lightweight sprite" in text:
+                    widget.set_selectable(False)
+                    widget.set_focusable(False)
+            child = widget.get_first_child()
+            while child:
+                prevent_label_selection(child)
+                child = child.get_next_sibling()
+        
+        prevent_label_selection(self)
+
+    def present(self) -> None:
+        super().present()
+        # Schedule clearing focus to the next idle cycle to ensure no widget remains highlighted
+        GLib.idle_add(self._clear_focus)
+
+    def _clear_focus(self) -> bool:
+        self.set_focus(None)
+        return False
 
 
 class ImagePreviewWindow(Gtk.Window):
