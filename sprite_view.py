@@ -228,6 +228,7 @@ class ImagePreviewWindow(Gtk.Window):
 
         # Create popover content for settings
         popover = Gtk.Popover()
+        popover.set_autohide(True)
         popover_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         popover_box.set_margin_start(12)
         popover_box.set_margin_end(12)
@@ -649,6 +650,9 @@ class ImagePreviewWindow(Gtk.Window):
         active = check_button.get_active()
         self.settings["remember_fps"] = active
         self.scope_dropdown.set_sensitive(active)
+        
+        # Grab focus back to check button to prevent popover grab/focus loss when disabling dropdown
+        check_button.grab_focus()
         
         if active and hasattr(self, "fps_spin") and self.first_frame_path:
             current_fps = self.fps_spin.get_value()
