@@ -38,10 +38,17 @@ class AboutWindow(Gtk.AboutDialog):
         
         prevent_label_selection(self)
 
+        # Connect explicit close-request to direct destroy call
+        self.connect("close-request", self._on_close_request)
+
         # Close window when ESC key is pressed
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_controller)
+
+    def _on_close_request(self, window) -> bool:
+        self.destroy()
+        return True
 
     def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
         if keyval == Gdk.KEY_Escape:

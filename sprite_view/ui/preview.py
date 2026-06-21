@@ -1103,6 +1103,7 @@ class ExportOptionsWindow(Gtk.Window):
     def __init__(self, parent_win) -> None:
         super().__init__(title="Advanced Export Options")
         self.set_transient_for(parent_win)
+        self.connect("close-request", self._on_close_request)
         self.set_default_size(360, 440)
         self.parent_win = parent_win
 
@@ -1234,6 +1235,10 @@ class ExportOptionsWindow(Gtk.Window):
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_controller)
+
+    def _on_close_request(self, window) -> bool:
+        self.destroy()
+        return True
 
     def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
         if keyval == Gdk.KEY_Escape:
