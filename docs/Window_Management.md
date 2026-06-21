@@ -163,6 +163,15 @@ class WindowManager:
         cls._singletons[name] = None
 ```
 
+---
+
+## 4. Explicit Close-Request Handling
+
+To prevent transient child windows from entering invalid hidden/partially-destroyed states under different desktop environments and window managers:
+* All secondary windows (`AboutWindow`, `SettingsWindow`, `ExportOptionsWindow`) explicitly connect to the GTK `"close-request"` signal.
+* The handler calls `self.destroy()` directly to force complete object destruction and triggers the `WindowManager` tracking cleanup.
+* The handler returns `True` to inhibit standard window-manager-driven close flows that could clash with PyGObject's event loop.
+
 ### Key Advantages of the Proposed Registry
 1. **Decoupled Logic**: Moves memory tracking, list sweeping, and event routing out of the view classes (`ImagePreviewWindow`, `ExportOptionsWindow`).
 2. **Automatic Safety Nets**: If a developer forgets to clean up a child window, the `WindowManager` automatically sweeps and destroys it when the parent terminates.
