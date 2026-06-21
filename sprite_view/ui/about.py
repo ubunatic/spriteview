@@ -3,7 +3,8 @@
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, GLib
+gi.require_version('Gdk', '4.0')
+from gi.repository import Gtk, Gdk, GLib
 from sprite_view.logo import get_embedded_banner
 
 class AboutWindow(Gtk.AboutDialog):
@@ -36,6 +37,17 @@ class AboutWindow(Gtk.AboutDialog):
                 child = child.get_next_sibling()
         
         prevent_label_selection(self)
+
+        # Close window when ESC key is pressed
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self._on_key_pressed)
+        self.add_controller(key_controller)
+
+    def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        return False
 
     def present(self) -> None:
         super().present()

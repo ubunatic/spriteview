@@ -316,6 +316,11 @@ class ImagePreviewWindow(Gtk.Window):
 
         right_box.append(self.color_details_box)
 
+        # Close window when ESC key is pressed
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self._on_key_pressed)
+        self.add_controller(key_controller)
+
         # If it's single image, skip animation controls setup but populate properties
         if len(self.textures) == 1:
             self._update_frame()
@@ -439,6 +444,12 @@ class ImagePreviewWindow(Gtk.Window):
         if self.is_playing:
             self._advance_frame()
         return True
+
+    def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        return False
 
     def _on_destroy(self, widget) -> None:
         if self.timer_id is not None:

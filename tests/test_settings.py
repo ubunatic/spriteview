@@ -32,5 +32,25 @@ class TestSettings(unittest.TestCase):
         mock_makedirs.assert_called_once_with("/tmp", exist_ok=True)
         mock_file.assert_called_once_with("/tmp/mock_config.json", "w")
 
+    @patch("sprite_view.ui.settings.save_settings")
+    def test_settings_window_esc_close(self, mock_save):
+        from sprite_view.ui.settings import SettingsWindow
+        from unittest.mock import MagicMock
+        from gi.repository import Gdk
+        
+        # Create a mock window instance
+        win = MagicMock(spec=SettingsWindow)
+        win.close = MagicMock()
+        
+        # Test non-Escape key using the unbound method
+        handled = SettingsWindow._on_key_pressed(win, None, Gdk.KEY_0, None, None)
+        self.assertFalse(handled)
+        win.close.assert_not_called()
+        
+        # Test Escape key using the unbound method
+        handled = SettingsWindow._on_key_pressed(win, None, Gdk.KEY_Escape, None, None)
+        self.assertTrue(handled)
+        win.close.assert_called_once()
+
 if __name__ == "__main__":
     unittest.main()

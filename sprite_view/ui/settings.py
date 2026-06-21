@@ -3,7 +3,8 @@
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, GLib
+gi.require_version('Gdk', '4.0')
+from gi.repository import Gtk, Gdk, GLib
 from sprite_view.settings import save_settings
 
 class SettingsWindow(Gtk.Window):
@@ -74,6 +75,17 @@ class SettingsWindow(Gtk.Window):
         self.default_mode_dropdown.connect("notify::selected", self._on_default_mode_changed)
         default_mode_row.append(self.default_mode_dropdown)
         box.append(default_mode_row)
+
+        # Close window when ESC key is pressed
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self._on_key_pressed)
+        self.add_controller(key_controller)
+
+    def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        return False
 
     def _on_default_fps_changed(self, spin_button) -> None:
         self.settings["default_fps"] = spin_button.get_value()
