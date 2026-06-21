@@ -30,18 +30,18 @@ sleep 1.5
 gsettings set org.gnome.nautilus.window-state initial-size "$orig_size"
 ```
 
-## Integrating with Make
+## Important Caveat: Persistence on Close
 
-You can also integrate this pattern directly into a `Makefile`:
+While the GSettings override pattern successfully controls the startup size of a newly opened window, **Nautilus automatically persists its window size to GSettings when the window is closed**. 
 
-```makefile
-GEOMETRY_WIDTH  := 600
-GEOMETRY_HEIGHT := 400
+If the overridden window (e.g., sized at `600x400`) is closed, Nautilus will write `(600, 400)` back into the `initial-size` key upon exit, overwriting the restored value.
 
-nautilus: ⚙️  ## open sprites dir in a small Nautilus window
-	@orig_size=$$(gsettings get org.gnome.nautilus.window-state initial-size) && \
-	gsettings set org.gnome.nautilus.window-state initial-size '($(GEOMETRY_WIDTH), $(GEOMETRY_HEIGHT))' && \
-	nautilus --no-desktop sprites & \
-	sleep 1.5 && \
-	gsettings set org.gnome.nautilus.window-state initial-size "$$orig_size"
+### Resetting to Defaults
+
+If your Nautilus window size becomes stuck at a small size, you can reset it to the GNOME system defaults with the following command:
+
+```bash
+gsettings reset org.gnome.nautilus.window-state initial-size
 ```
+
+Because of this built-in persistence behavior, it is generally recommended **not to force window geometry programmatically** in development scripts or Makefiles, but rather to allow the user's manual resizing preferences to dictate the layout naturally.
