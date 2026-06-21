@@ -195,6 +195,122 @@ def save_settings(settings: dict) -> None:
         print(f"Error saving settings: {e}")
 
 
+class SettingsWindow(Gtk.Window):
+    def __init__(self, parent_win) -> None:
+        super().__init__(title="Settings")
+        self.set_transient_for(parent_win)
+        self.set_modal(True)
+        self.set_default_size(320, 240)
+        self.parent_win = parent_win
+        self.settings = parent_win.settings
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_start(16)
+        box.set_margin_end(16)
+        box.set_margin_top(16)
+        box.set_margin_bottom(16)
+        self.set_child(box)
+
+        # 1. Default FPS Row
+        default_fps_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        df_lbl = Gtk.Label(label="Default FPS:")
+        df_lbl.set_halign(Gtk.Align.START)
+        df_lbl.set_hexpand(True)
+        default_fps_row.append(df_lbl)
+
+        df_adj = Gtk.Adjustment(value=self.settings.get("default_fps", 15.0), lower=1.0, upper=60.0, step_increment=1.0)
+        self.df_spin = Gtk.SpinButton(adjustment=df_adj, climb_rate=1.0, digits=0)
+        self.df_spin.connect("value-changed", self._on_default_fps_changed)
+        default_fps_row.append(self.df_spin)
+        box.append(default_fps_row)
+
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(sep)
+
+        # 2. Remember FPS CheckButton
+        self.remember_check = Gtk.CheckButton(label="Remember FPS")
+        self.remember_check.set_active(self.settings.get("remember_fps", True))
+        self.remember_check.connect("toggled", self._on_remember_changed)
+        box.append(self.remember_check)
+
+        # 3. Remember Scope Row
+        scope_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        sc_lbl = Gtk.Label(label="Scope:")
+        sc_lbl.set_halign(Gtk.Align.START)
+        sc_lbl.set_hexpand(True)
+        scope_row.append(sc_lbl)
+
+        self.scope_dropdown = Gtk.DropDown.new_from_strings(["Per Sheet", "Per Directory"])
+        current_scope = self.settings.get("remember_scope", "sheet")
+        self.scope_dropdown.set_selected(0 if current_scope == "sheet" else 1)
+        self.scope_dropdown.set_sensitive(self.settings.get("remember_fps", True))
+        self.scope_dropdown.connect("notify::selected", self._on_remember_scope_changed)
+        scope_row.append(self.scope_dropdown)
+        box.append(scope_row)
+
+        sep_mode = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(sep_mode)
+
+        # 4. Default Mode Row
+        default_mode_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        dm_lbl = Gtk.Label(label="Default Mode:")
+        dm_lbl.set_halign(Gtk.Align.START)
+        dm_lbl.set_hexpand(True)
+        default_mode_row.append(dm_lbl)
+
+        self.default_mode_dropdown = Gtk.DropDown.new_from_strings(["Loop", "Ping-Pong", "Once"])
+        self.default_mode_dropdown.set_selected(self.settings.get("default_mode", 0))
+        self.default_mode_dropdown.connect("notify::selected", self._on_default_mode_changed)
+        default_mode_row.append(self.default_mode_dropdown)
+        box.append(default_mode_row)
+
+    def _on_default_fps_changed(self, spin_button) -> None:
+        self.settings["default_fps"] = spin_button.get_value()
+        save_settings(self.settings)
+
+    def _on_remember_changed(self, check_button) -> None:
+        active = check_button.get_active()
+        self.settings["remember_fps"] = active
+        self.scope_dropdown.set_sensitive(active)
+        
+        if active and hasattr(self.parent_win, "fps_spin") and self.parent_win.first_frame_path:
+            current_fps = self.parent_win.fps_spin.get_value()
+            scope = self.settings.get("remember_scope", "sheet")
+            key = f"sheet:{self.parent_win.first_frame_path}" if scope == "sheet" else f"dir:{self.parent_win.dir_path}"
+            self.settings.setdefault("saved_fps", {})[key] = current_fps
+            
+        save_settings(self.settings)
+
+    def _on_remember_scope_changed(self, dropdown, pspec) -> None:
+        selected_idx = dropdown.get_selected()
+        scope = "sheet" if selected_idx == 0 else "dir"
+        self.settings["remember_scope"] = scope
+        
+        if self.settings.get("remember_fps", True) and hasattr(self.parent_win, "fps_spin") and self.parent_win.first_frame_path:
+            current_fps = self.parent_win.fps_spin.get_value()
+            key = f"sheet:{self.parent_win.first_frame_path}" if scope == "sheet" else f"dir:{self.parent_win.dir_path}"
+            self.settings.setdefault("saved_fps", {})[key] = current_fps
+            
+        save_settings(self.settings)
+
+    def _on_default_mode_changed(self, dropdown, pspec) -> None:
+        self.settings["default_mode"] = dropdown.get_selected()
+        save_settings(self.settings)
+
+
+class AboutWindow(Gtk.AboutDialog):
+    def __init__(self, parent_win) -> None:
+        super().__init__()
+        self.set_transient_for(parent_win)
+        self.set_modal(True)
+        self.set_program_name("Nautilus Sprite View")
+        self.set_version("1.0.0")
+        self.set_comments("A lightweight sprite sheet and animation frame previewer for Nautilus.")
+        self.set_website("https://github.com/ubunatic/nautilus")
+        self.set_copyright("© 2026 Uwe Jugel")
+        self.set_license_type(Gtk.License.AGPL_3_0_ONLY)
+
+
 class ImagePreviewWindow(Gtk.Window):
     def __init__(self, file_paths: List[str], selected_file_path: str, title: str) -> None:
         super().__init__(title=title)
@@ -227,74 +343,28 @@ class ImagePreviewWindow(Gtk.Window):
         menu_button = Gtk.MenuButton()
         menu_button.set_icon_name("open-menu-symbolic")
 
-        # Create popover content for settings
-        popover = Gtk.Popover()
-        popover.set_autohide(True)
-        popover_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        popover_box.set_margin_start(12)
-        popover_box.set_margin_end(12)
-        popover_box.set_margin_top(12)
-        popover_box.set_margin_bottom(12)
+        # Create a simple popover containing "Settings..." and "About..." buttons
+        menu_popover = Gtk.Popover()
+        menu_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        menu_box.set_margin_start(6)
+        menu_box.set_margin_end(6)
+        menu_box.set_margin_top(6)
+        menu_box.set_margin_bottom(6)
 
-        settings_title = Gtk.Label()
-        settings_title.set_markup("<b>Settings</b>")
-        settings_title.set_halign(Gtk.Align.START)
-        popover_box.append(settings_title)
+        btn_settings = Gtk.Button(label="Settings...")
+        btn_settings.set_has_frame(False)
+        btn_settings.set_halign(Gtk.Align.START)
+        btn_settings.connect("clicked", self._on_settings_clicked, menu_popover)
+        menu_box.append(btn_settings)
 
-        # 1. Default FPS Row
-        default_fps_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        df_lbl = Gtk.Label(label="Default FPS:")
-        df_lbl.set_halign(Gtk.Align.START)
-        default_fps_row.append(df_lbl)
+        btn_about = Gtk.Button(label="About...")
+        btn_about.set_has_frame(False)
+        btn_about.set_halign(Gtk.Align.START)
+        btn_about.connect("clicked", self._on_about_clicked, menu_popover)
+        menu_box.append(btn_about)
 
-        df_adj = Gtk.Adjustment(value=self.settings.get("default_fps", 15.0), lower=1.0, upper=60.0, step_increment=1.0)
-        self.df_spin = Gtk.SpinButton(adjustment=df_adj, climb_rate=1.0, digits=0)
-        self.df_spin.connect("value-changed", self._on_default_fps_changed)
-        default_fps_row.append(self.df_spin)
-        popover_box.append(default_fps_row)
-
-        # Separator
-        sep_set = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        popover_box.append(sep_set)
-
-        # 2. Remember FPS CheckButton
-        self.remember_check = Gtk.CheckButton(label="Remember FPS")
-        self.remember_check.set_active(self.settings.get("remember_fps", True))
-        self.remember_check.connect("toggled", self._on_remember_changed)
-        popover_box.append(self.remember_check)
-
-        # 3. Remember Scope Row
-        scope_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        sc_lbl = Gtk.Label(label="Scope:")
-        sc_lbl.set_halign(Gtk.Align.START)
-        scope_row.append(sc_lbl)
-
-        self.scope_dropdown = Gtk.DropDown.new_from_strings(["Per Sheet", "Per Directory"])
-        current_scope = self.settings.get("remember_scope", "sheet")
-        self.scope_dropdown.set_selected(0 if current_scope == "sheet" else 1)
-        self.scope_dropdown.set_sensitive(self.settings.get("remember_fps", True))
-        self.scope_dropdown.connect("notify::selected", self._on_remember_scope_changed)
-        scope_row.append(self.scope_dropdown)
-        popover_box.append(scope_row)
-
-        # Separator
-        sep_mode = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        popover_box.append(sep_mode)
-
-        # 4. Default Mode Row
-        default_mode_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        dm_lbl = Gtk.Label(label="Default Mode:")
-        dm_lbl.set_halign(Gtk.Align.START)
-        default_mode_row.append(dm_lbl)
-
-        self.default_mode_dropdown = Gtk.DropDown.new_from_strings(["Loop", "Ping-Pong", "Once"])
-        self.default_mode_dropdown.set_selected(self.settings.get("default_mode", 0))
-        self.default_mode_dropdown.connect("notify::selected", self._on_default_mode_changed)
-        default_mode_row.append(self.default_mode_dropdown)
-        popover_box.append(default_mode_row)
-
-        popover.set_child(popover_box)
-        menu_button.set_popover(popover)
+        menu_popover.set_child(menu_box)
+        menu_button.set_popover(menu_popover)
         header_bar.pack_end(menu_button)
 
         self.textures: List[Gdk.Texture] = []
@@ -317,23 +387,6 @@ class ImagePreviewWindow(Gtk.Window):
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         paned.set_position(500)
         self.set_child(paned)
-
-        self.settings_popover = popover
-
-        # 1. Close settings popover when clicking anywhere in the main window body
-        window_click_ctrl = Gtk.GestureClick()
-        window_click_ctrl.connect("pressed", lambda gesture, n_press, x, y: self.settings_popover.popdown())
-        paned.add_controller(window_click_ctrl)
-
-        # 2. Close settings popover when clicking the header bar
-        header_click_ctrl = Gtk.GestureClick()
-        header_click_ctrl.connect("pressed", lambda gesture, n_press, x, y: self.settings_popover.popdown())
-        header_bar.add_controller(header_click_ctrl)
-
-        # 3. Close settings popover if the main window loses keyboard focus completely
-        window_focus_ctrl = Gtk.EventControllerFocus()
-        window_focus_ctrl.connect("leave", lambda ctrl: self.settings_popover.popdown())
-        self.add_controller(window_focus_ctrl)
 
         # Left pane (main preview and controls)
         left_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -676,47 +729,15 @@ class ImagePreviewWindow(Gtk.Window):
             self.settings.setdefault("saved_fps", {})[key] = fps
             save_settings(self.settings)
 
-    def _on_default_fps_changed(self, spin_button) -> None:
-        self.settings["default_fps"] = spin_button.get_value()
-        save_settings(self.settings)
+    def _on_settings_clicked(self, button, popover) -> None:
+        popover.popdown()
+        settings_win = SettingsWindow(self)
+        settings_win.present()
 
-    def _on_remember_changed(self, check_button) -> None:
-        active = check_button.get_active()
-        self.settings["remember_fps"] = active
-        self.scope_dropdown.set_sensitive(active)
-        
-        # Grab focus back to check button to prevent popover grab/focus loss when disabling dropdown
-        check_button.grab_focus()
-        
-        if active and hasattr(self, "fps_spin") and self.first_frame_path:
-            current_fps = self.fps_spin.get_value()
-            scope = self.settings.get("remember_scope", "sheet")
-            key = f"sheet:{self.first_frame_path}" if scope == "sheet" else f"dir:{self.dir_path}"
-            self.settings.setdefault("saved_fps", {})[key] = current_fps
-            
-        save_settings(self.settings)
-
-    def _on_remember_scope_changed(self, dropdown, pspec) -> None:
-        selected_idx = dropdown.get_selected()
-        scope = "sheet" if selected_idx == 0 else "dir"
-        self.settings["remember_scope"] = scope
-        
-        # Grab focus back to restore Popover's active grab
-        dropdown.grab_focus()
-        
-        if self.settings.get("remember_fps", True) and hasattr(self, "fps_spin") and self.first_frame_path:
-            current_fps = self.fps_spin.get_value()
-            key = f"sheet:{self.first_frame_path}" if scope == "sheet" else f"dir:{self.dir_path}"
-            self.settings.setdefault("saved_fps", {})[key] = current_fps
-            
-        save_settings(self.settings)
-
-    def _on_default_mode_changed(self, dropdown, pspec) -> None:
-        self.settings["default_mode"] = dropdown.get_selected()
-        save_settings(self.settings)
-        
-        # Grab focus back to restore Popover's active grab
-        dropdown.grab_focus()
+    def _on_about_clicked(self, button, popover) -> None:
+        popover.popdown()
+        about_win = AboutWindow(self)
+        about_win.present()
 
     def _on_mode_changed(self, dropdown, pspec) -> None:
         self.play_direction = 1
