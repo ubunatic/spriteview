@@ -629,4 +629,14 @@ class ImagePreviewWindow(Gtk.Window):
             self.set_focus(self.btn_play_pause)
         else:
             self.set_focus(None)
+
+        # Ensure no selectable labels have an active or inactive text selection on startup
+        def clear_selections(widget):
+            if isinstance(widget, Gtk.Label) and widget.get_selectable():
+                widget.select_region(0, 0)
+            child = widget.get_first_child()
+            while child:
+                clear_selections(child)
+                child = child.get_next_sibling()
+        clear_selections(self)
         return False
