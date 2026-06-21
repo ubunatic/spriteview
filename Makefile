@@ -1,7 +1,10 @@
 .PHONY: ⚙️  # make all targets phony
 
+SHELL := bash
 EXTENSION_NAME := sprite_view.py
 INSTALL_SCRIPT := scripts/install.sh
+
+_sleep := s(){ for t in $$(seq $$1); do sleep 1; echo -n "."; done; echo; }; s
 
 help: ⚙️  ## show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | \
@@ -13,7 +16,10 @@ open: ⚙️  ## open sprites dir using "open"
 nautilus: ⚙️  ## open sprites dir using "nautilus" directly
 	@./scripts/nautilus-open
 
-dev: ⚙️test install nautilus
+dev: ⚙️ test install
+	@echo -n "waiting for nautilus restart"
+	@$(_sleep) 3
+	$(MAKE) open
 
 browse: ⚙️ ##  open website in browser
 	open website/index.html
