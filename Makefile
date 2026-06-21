@@ -24,13 +24,17 @@ dev: ⚙️ test install
 browse: ⚙️ ##  open website in browser
 	open website/index.html
 
-test: ⚙️  ## run syntax check on the Python extension
+test: ⚙️  ## run syntax check and unit tests
 	python3 -m py_compile $(EXTENSION_NAME)
-	@echo "✅ Extension syntax check passed"
+	python3 -m unittest discover -s tests
+	@echo "✅ Extension syntax check and unit tests passed"
 
-install: ⚙️ test  ## install the extension and restart Nautilus
-	@cp $(EXTENSION_NAME) "$(HOME)/.local/share/nautilus-python/extensions/$(EXTENSION_NAME)"
-	@echo "✅ Installed local version of $(EXTENSION_NAME)"
+pack: ⚙️  ## pack the app into a single self-contained file
+	python3 scripts/pack.py
+
+install: ⚙️ test pack  ## pack and install the extension, then restart Nautilus
+	@cp dist/$(EXTENSION_NAME) "$(HOME)/.local/share/nautilus-python/extensions/$(EXTENSION_NAME)"
+	@echo "✅ Packed and installed single-file version of $(EXTENSION_NAME)"
 
 script-install: ⚙️ test  ## install the extension and restart Nautilus
 	@chmod +x $(INSTALL_SCRIPT)
@@ -38,9 +42,8 @@ script-install: ⚙️ test  ## install the extension and restart Nautilus
 
 uninstall: ⚙️  ## uninstall the extension and restart Nautilus
 	@rm -f "$(HOME)/.local/share/nautilus-python/extensions/$(EXTENSION_NAME)"
-	@rm -f "$(HOME)/.local/share/nautilus-python/extensions/__pycache__/sprite_view."*
-	@rm -f "$(HOME)/.local/share/nautilus-python/extensions/nautilus_preview.py"
-	@rm -f "$(HOME)/.local/share/nautilus-python/extensions/__pycache__/nautilus_preview."*
+	@rm -rf "$(HOME)/.local/share/nautilus-python/extensions/sprite_view"
+	@rm -rf "$(HOME)/.local/share/nautilus-python/extensions/__pycache__"
 	@nautilus -q || echo "failed to restart nautilus, see errors above"
 	@echo "✅ Uninstalled extension and restarted Nautilus"
 

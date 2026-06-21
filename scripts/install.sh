@@ -38,10 +38,22 @@ then pass "Created target extension directory"
 else fail "Could not create directory: $user_ext_dir"
 fi
 
-if test -f "$extension_name"
+if test -f "dist/$extension_name"
+then if cp "dist/$extension_name" "$user_ext_dir/$extension_name"
+     then pass "Copied packed dist/$extension_name to $user_ext_dir"
+     else fail "Could not copy dist/$extension_name to $user_ext_dir"
+     fi
+elif test -f "$extension_name"
 then if cp "$extension_name" "$user_ext_dir/$extension_name"
      then pass "Copied $extension_name to $user_ext_dir"
      else fail "Could not copy $extension_name to $user_ext_dir"
+     fi
+     if test -d "sprite_view"
+     then mkdir -p "$user_ext_dir/sprite_view"
+          if cp -r sprite_view/* "$user_ext_dir/sprite_view/"
+          then pass "Copied sprite_view package to $user_ext_dir/sprite_view"
+          else fail "Could not copy sprite_view package to $user_ext_dir/sprite_view"
+          fi
      fi
 else printf 'Downloading %s from Codeberg...\n' "$extension_name" >&2
      if curl -sSL -o "$user_ext_dir/$extension_name" "https://codeberg.org/nautilus-spriteview/raw/branch/main/sprite_view.py"
