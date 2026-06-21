@@ -2,13 +2,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import os
+import re
+import tempfile
+import subprocess
+import threading
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('GdkPixbuf', '2.0')
-from gi.repository import Gtk, Gdk, GdkPixbuf, GLib
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Gio
 from typing import List
 from collections import Counter
+from PIL import Image
 
 from sprite_view.utils import format_size, rgb_to_ansi, get_short_hex
 from sprite_view.settings import load_settings, save_settings
@@ -97,6 +102,62 @@ class ImagePreviewWindow(Gtk.Window):
         menu_box.set_margin_end(6)
         menu_box.set_margin_top(6)
         menu_box.set_margin_bottom(6)
+
+        # Export Actions Group
+        if len(self.file_paths) > 1:
+            btn_export_png = Gtk.Button(label="Export Frame as PNG...")
+            btn_export_png.set_has_frame(False)
+            btn_export_png.set_halign(Gtk.Align.START)
+            btn_export_png.connect("clicked", self._on_export_png_clicked, menu_popover)
+            menu_box.append(btn_export_png)
+
+            btn_export_gif_frame = Gtk.Button(label="Export Frame as GIF...")
+            btn_export_gif_frame.set_has_frame(False)
+            btn_export_gif_frame.set_halign(Gtk.Align.START)
+            btn_export_gif_frame.connect("clicked", self._on_export_gif_frame_clicked, menu_popover)
+            menu_box.append(btn_export_gif_frame)
+
+            btn_export_ico = Gtk.Button(label="Export Frame as ICO...")
+            btn_export_ico.set_has_frame(False)
+            btn_export_ico.set_halign(Gtk.Align.START)
+            btn_export_ico.connect("clicked", self._on_export_ico_clicked, menu_popover)
+            menu_box.append(btn_export_ico)
+
+            sep_anim = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+            menu_box.append(sep_anim)
+
+            btn_export_gif_anim = Gtk.Button(label="Export Animation as GIF...")
+            btn_export_gif_anim.set_has_frame(False)
+            btn_export_gif_anim.set_halign(Gtk.Align.START)
+            btn_export_gif_anim.connect("clicked", self._on_export_gif_anim_clicked, menu_popover)
+            menu_box.append(btn_export_gif_anim)
+
+            btn_export_webm = Gtk.Button(label="Export Animation as WebM...")
+            btn_export_webm.set_has_frame(False)
+            btn_export_webm.set_halign(Gtk.Align.START)
+            btn_export_webm.connect("clicked", self._on_export_webm_clicked, menu_popover)
+            menu_box.append(btn_export_webm)
+        else:
+            btn_export_png = Gtk.Button(label="Export as PNG...")
+            btn_export_png.set_has_frame(False)
+            btn_export_png.set_halign(Gtk.Align.START)
+            btn_export_png.connect("clicked", self._on_export_png_clicked, menu_popover)
+            menu_box.append(btn_export_png)
+
+            btn_export_gif = Gtk.Button(label="Export as GIF...")
+            btn_export_gif.set_has_frame(False)
+            btn_export_gif.set_halign(Gtk.Align.START)
+            btn_export_gif.connect("clicked", self._on_export_gif_frame_clicked, menu_popover)
+            menu_box.append(btn_export_gif)
+
+            btn_export_ico = Gtk.Button(label="Export as ICO...")
+            btn_export_ico.set_has_frame(False)
+            btn_export_ico.set_halign(Gtk.Align.START)
+            btn_export_ico.connect("clicked", self._on_export_ico_clicked, menu_popover)
+            menu_box.append(btn_export_ico)
+
+        sep_menu = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        menu_box.append(sep_menu)
 
         btn_settings = Gtk.Button(label="Settings...")
         btn_settings.set_has_frame(False)
@@ -730,6 +791,199 @@ class ImagePreviewWindow(Gtk.Window):
         self.picture.set_paintable(self.textures[self.current_frame])
         for i, thumb_pic in enumerate(self.thumb_pics):
             thumb_pic.set_paintable(self.textures[i])
+
+    def _get_default_animation_name(self, ext: str) -> str:
+        if not self.file_paths:
+            return f"animation.{ext}"
+        first_file = os.path.basename(self.file_paths[0])
+        import re
+        seps = self.settings.get("sequence_separators", ["_", "-"])
+        sep_alts = "|".join(re.escape(s) for s in seps)
+        match = re.match(rf"^(.*)({sep_alts})([0-9]{{2,4}})\.(png|gif|bmp|jpg|jpeg|webp)$", first_file, re.IGNORECASE)
+        if match:
+            prefix = match.group(1)
+            return f"{prefix}.{ext}"
+        base, _ = os.path.splitext(first_file)
+        return f"{base}.{ext}"
+
+    def _get_pil_image(self, index: int, pad_to_canvas: bool = True) -> "Image.Image":
+        from PIL import Image
+        path = self.file_paths[index]
+        img = Image.open(path)
+        
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
+            
+        if pad_to_canvas and self.has_mixed_sizes:
+            canvas_w, canvas_h = self.canvas_size
+            src_w, src_h = img.size
+            
+            canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+            
+            align = self.current_align
+            row, col = align // 3, align % 3
+            dx = (canvas_w - src_w) * col // 2
+            dy = (canvas_h - src_h) * row // 2
+            
+            canvas.paste(img, (dx, dy))
+            return canvas
+        return img
+
+    def _export_image_to(self, default_name: str, ext: str, save_func) -> None:
+        dialog = Gtk.FileDialog.new()
+        dialog.set_title(f"Export {ext.upper()}")
+        dialog.set_initial_name(default_name)
+        
+        if self.file_paths:
+            parent_dir = os.path.dirname(self.file_paths[0])
+            gio_folder = Gio.File.new_for_path(parent_dir)
+            dialog.set_initial_folder(gio_folder)
+            
+        store = Gio.ListStore.new(Gtk.FileFilter)
+        f = Gtk.FileFilter()
+        f.set_name(f"{ext.upper()} Files (*.{ext})")
+        f.add_pattern(f"*.{ext}")
+        store.append(f)
+        dialog.set_filters(store)
+        dialog.set_default_filter(f)
+        
+        def on_saved(dialog_obj, result, user_data):
+            try:
+                gfile = dialog_obj.save_finish(result)
+                if gfile:
+                    dest_path = gfile.get_path()
+                    if dest_path:
+                        if not dest_path.lower().endswith(f".{ext}"):
+                            dest_path += f".{ext}"
+                        
+                        def bg_save():
+                            try:
+                                save_func(dest_path)
+                                GLib.idle_add(self._show_export_success, dest_path)
+                            except Exception as ex:
+                                GLib.idle_add(self._show_error_dialog, f"Failed to export: {str(ex)}")
+                        
+                        import threading
+                        threading.Thread(target=bg_save, daemon=True).start()
+            except Exception as e:
+                err_str = str(e)
+                if "dismiss" not in err_str.lower() and "cancel" not in err_str.lower():
+                    GLib.idle_add(self._show_error_dialog, f"Failed to export: {err_str}")
+                    
+        dialog.save(self, None, on_saved, None)
+
+    def _show_export_success(self, path: str) -> None:
+        filename = os.path.basename(path)
+        try:
+            from gi.repository import Notify
+            if not Notify.is_initted():
+                Notify.init("NautilusPreview")
+            n = Notify.Notification.new("Export Successful", f"Exported {filename}", "info")
+            n.show()
+        except Exception:
+            alert = Gtk.AlertDialog.new()
+            alert.set_message(f"Successfully exported to:\n{path}")
+            alert.show(self)
+
+    def _show_error_dialog(self, message: str) -> None:
+        alert = Gtk.AlertDialog.new()
+        alert.set_message(message)
+        alert.show(self)
+
+    def _on_export_png_clicked(self, button, popover) -> None:
+        popover.popdown()
+        current_path = self.file_paths[self.current_frame]
+        base = os.path.basename(current_path)
+        name, _ = os.path.splitext(base)
+        default_name = f"{name}.png"
+        
+        def save_png(dest_path):
+            img = self._get_pil_image(self.current_frame, pad_to_canvas=True)
+            img.save(dest_path, "PNG")
+            
+        self._export_image_to(default_name, "png", save_png)
+
+    def _on_export_gif_frame_clicked(self, button, popover) -> None:
+        popover.popdown()
+        current_path = self.file_paths[self.current_frame]
+        base = os.path.basename(current_path)
+        name, _ = os.path.splitext(base)
+        default_name = f"{name}.gif"
+        
+        def save_gif_frame(dest_path):
+            img = self._get_pil_image(self.current_frame, pad_to_canvas=True)
+            img.save(dest_path, "GIF")
+            
+        self._export_image_to(default_name, "gif", save_gif_frame)
+
+    def _on_export_ico_clicked(self, button, popover) -> None:
+        popover.popdown()
+        current_path = self.file_paths[self.current_frame]
+        base = os.path.basename(current_path)
+        name, _ = os.path.splitext(base)
+        default_name = f"{name}.ico"
+        
+        def save_ico(dest_path):
+            img = self._get_pil_image(self.current_frame, pad_to_canvas=True)
+            w, h = img.size
+            if w > 256 or h > 256:
+                ratio = min(256 / w, 256 / h)
+                new_w, new_h = int(w * ratio), int(h * ratio)
+                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            img.save(dest_path, format="ICO")
+            
+        self._export_image_to(default_name, "ico", save_ico)
+
+    def _on_export_gif_anim_clicked(self, button, popover) -> None:
+        popover.popdown()
+        default_name = self._get_default_animation_name("gif")
+        
+        def save_gif_anim(dest_path):
+            images = [self._get_pil_image(i, pad_to_canvas=True) for i in range(len(self.file_paths))]
+            fps = self.fps_spin.get_value()
+            duration_ms = int(1000.0 / fps)
+            
+            images[0].save(
+                dest_path,
+                "GIF",
+                save_all=True,
+                append_images=images[1:],
+                duration=duration_ms,
+                loop=0
+            )
+            
+        self._export_image_to(default_name, "gif", save_gif_anim)
+
+    def _on_export_webm_clicked(self, button, popover) -> None:
+        popover.popdown()
+        default_name = self._get_default_animation_name("webm")
+        
+        def save_webm(dest_path):
+            import tempfile
+            import subprocess
+            
+            fps = self.fps_spin.get_value()
+            
+            with tempfile.TemporaryDirectory() as tmpdir:
+                for i in range(len(self.file_paths)):
+                    img = self._get_pil_image(i, pad_to_canvas=True)
+                    frame_path = os.path.join(tmpdir, f"frame_{i:04d}.png")
+                    img.save(frame_path, "PNG")
+                    
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-framerate", str(fps),
+                    "-i", os.path.join(tmpdir, "frame_%04d.png"),
+                    "-c:v", "libvpx-vp9",
+                    "-pix_fmt", "yuva420p",
+                    dest_path
+                ]
+                
+                res = subprocess.run(cmd, capture_output=True)
+                if res.returncode != 0:
+                    raise Exception(f"ffmpeg error: {res.stderr.decode()}")
+                    
+        self._export_image_to(default_name, "webm", save_webm)
 
     def present(self) -> None:
         super().present()
