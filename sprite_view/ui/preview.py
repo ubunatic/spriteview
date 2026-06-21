@@ -53,6 +53,9 @@ class SelectableLabel(Gtk.Label):
         self.set_focusable(False)
 
 class ImagePreviewWindow(Gtk.Window):
+    _shared_settings_win = None
+    _shared_about_win = None
+
     def __init__(self, file_paths: List[str], selected_file_path: str, title: str) -> None:
         super().__init__(title=title)
         self.set_default_size(780, 580)
@@ -491,6 +494,9 @@ class ImagePreviewWindow(Gtk.Window):
         if self.timer_id is not None:
             GLib.source_remove(self.timer_id)
             self.timer_id = None
+        for win in (ImagePreviewWindow._shared_settings_win, ImagePreviewWindow._shared_about_win):
+            if win is not None and win.get_transient_for() is self:
+                win.set_transient_for(None)
 
     def _on_fps_changed(self, spin_button) -> None:
         fps = spin_button.get_value()
@@ -508,14 +514,28 @@ class ImagePreviewWindow(Gtk.Window):
             save_settings(self.settings)
 
     def _on_settings_clicked(self, button, popover) -> None:
+        if ImagePreviewWindow._shared_settings_win is not None:
+            ImagePreviewWindow._shared_settings_win.present()
+            popover.popdown()
+            return
         popover.popdown()
-        settings_win = SettingsWindow(self)
-        settings_win.present()
+        ImagePreviewWindow._shared_settings_win = SettingsWindow(self)
+        ImagePreviewWindow._shared_settings_win.connect(
+            "destroy", lambda w: setattr(ImagePreviewWindow, "_shared_settings_win", None)
+        )
+        ImagePreviewWindow._shared_settings_win.present()
 
     def _on_about_clicked(self, button, popover) -> None:
+        if ImagePreviewWindow._shared_about_win is not None:
+            ImagePreviewWindow._shared_about_win.present()
+            popover.popdown()
+            return
         popover.popdown()
-        about_win = AboutWindow(self)
-        about_win.present()
+        ImagePreviewWindow._shared_about_win = AboutWindow(self)
+        ImagePreviewWindow._shared_about_win.connect(
+            "destroy", lambda w: setattr(ImagePreviewWindow, "_shared_about_win", None)
+        )
+        ImagePreviewWindow._shared_about_win.present()
 
     def _on_mode_changed(self, dropdown, pspec) -> None:
         self.play_direction = 1
