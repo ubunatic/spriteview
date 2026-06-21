@@ -22,7 +22,7 @@ try:
 except ImportError:
     Nautilus = None
 
-from gi.repository import GObject, Notify, Gtk
+from gi.repository import GObject, Notify, Gtk, GLib
 
 from sprite_view.utils import find_sprite_frames
 from sprite_view.ui.preview import ImagePreviewWindow, ExportOptionsWindow, WindowManager
@@ -372,7 +372,10 @@ def main() -> None:
             win.present()
 
             if args.export and args.export.lower() == "choose":
-                WindowManager.get_dependent(win, ExportOptionsWindow)
+                def launch_export_dialog():
+                    WindowManager.get_dependent(win, ExportOptionsWindow)
+                    return False
+                GLib.timeout_add(100, launch_export_dialog)
 
     app.connect("activate", on_activate)
     app.run([sys.argv[0]])

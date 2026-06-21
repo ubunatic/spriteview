@@ -161,8 +161,14 @@ class TestCLI(unittest.TestCase):
 
         self.assertIsNotNone(activate_func)
         
-        # Call activate function
-        activate_func(app_instance)
+        # Mock GLib.timeout_add to execute the callback immediately
+        def mock_timeout_add(delay, callback, *args):
+            callback(*args)
+            return 0
+
+        with patch("sprite_view_entry.GLib.timeout_add", side_effect=mock_timeout_add):
+            # Call activate function
+            activate_func(app_instance)
 
         # Verify preview window was created and presented
         mock_preview_win.assert_called_once()
