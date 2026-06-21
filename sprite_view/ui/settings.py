@@ -3,7 +3,7 @@
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib
 from sprite_view.settings import save_settings
 
 class SettingsWindow(Gtk.Window):
@@ -107,3 +107,13 @@ class SettingsWindow(Gtk.Window):
     def _on_default_mode_changed(self, dropdown, pspec) -> None:
         self.settings["default_mode"] = dropdown.get_selected()
         save_settings(self.settings)
+
+    def present(self) -> None:
+        super().present()
+        # Schedule focus on the first setting widget on presentation
+        GLib.idle_add(self._set_initial_focus)
+
+    def _set_initial_focus(self) -> bool:
+        if hasattr(self, "df_spin") and self.df_spin:
+            self.set_focus(self.df_spin)
+        return False

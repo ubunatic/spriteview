@@ -621,9 +621,12 @@ class ImagePreviewWindow(Gtk.Window):
 
     def present(self) -> None:
         super().present()
-        # Schedule clearing focus to the next idle cycle to ensure no widget remains highlighted on presentation
-        GLib.idle_add(self._clear_focus)
+        # Schedule setting/clearing focus on presentation to ensure proper startup focus state
+        GLib.idle_add(self._set_initial_focus)
 
-    def _clear_focus(self) -> bool:
-        self.set_focus(None)
+    def _set_initial_focus(self) -> bool:
+        if len(self.textures) > 1 and hasattr(self, "btn_play_pause") and self.btn_play_pause:
+            self.set_focus(self.btn_play_pause)
+        else:
+            self.set_focus(None)
         return False
