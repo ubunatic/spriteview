@@ -318,6 +318,23 @@ class ImagePreviewWindow(Gtk.Window):
         paned.set_position(500)
         self.set_child(paned)
 
+        self.settings_popover = popover
+
+        # 1. Close settings popover when clicking anywhere in the main window body
+        window_click_ctrl = Gtk.GestureClick()
+        window_click_ctrl.connect("pressed", lambda gesture, n_press, x, y: self.settings_popover.popdown())
+        paned.add_controller(window_click_ctrl)
+
+        # 2. Close settings popover when clicking the header bar
+        header_click_ctrl = Gtk.GestureClick()
+        header_click_ctrl.connect("pressed", lambda gesture, n_press, x, y: self.settings_popover.popdown())
+        header_bar.add_controller(header_click_ctrl)
+
+        # 3. Close settings popover if the main window loses keyboard focus completely
+        window_focus_ctrl = Gtk.EventControllerFocus()
+        window_focus_ctrl.connect("leave", lambda ctrl: self.settings_popover.popdown())
+        self.add_controller(window_focus_ctrl)
+
         # Left pane (main preview and controls)
         left_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         left_box.set_margin_start(10)
