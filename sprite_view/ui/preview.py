@@ -35,6 +35,12 @@ def init_css():
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
+class SelectableLabel(Gtk.Label):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.set_selectable(True)
+        self.set_focusable(False)
+
 class ImagePreviewWindow(Gtk.Window):
     def __init__(self, file_paths: List[str], selected_file_path: str, title: str) -> None:
         super().__init__(title=title)
@@ -186,7 +192,7 @@ class ImagePreviewWindow(Gtk.Window):
             t_lbl = Gtk.Label()
             t_lbl.set_markup(f"<b>{title}:</b>")
             t_lbl.set_halign(Gtk.Align.START)
-            v_lbl = Gtk.Label(label="-")
+            v_lbl = SelectableLabel(label="-")
             v_lbl.set_halign(Gtk.Align.START)
             row.append(t_lbl)
             row.append(v_lbl)
@@ -292,7 +298,7 @@ class ImagePreviewWindow(Gtk.Window):
             t_lbl = Gtk.Label()
             t_lbl.set_markup(f"<b>{title}:</b>")
             t_lbl.set_halign(Gtk.Align.START)
-            v_lbl = Gtk.Label(label="-")
+            v_lbl = SelectableLabel(label="-")
             v_lbl.set_halign(Gtk.Align.START)
             row.append(t_lbl)
             row.append(v_lbl)
