@@ -684,6 +684,9 @@ class ImagePreviewWindow(Gtk.Window):
         scope = "sheet" if selected_idx == 0 else "dir"
         self.settings["remember_scope"] = scope
         
+        # Grab focus back to restore Popover's active grab
+        dropdown.grab_focus()
+        
         if self.settings.get("remember_fps", True) and hasattr(self, "fps_spin") and self.first_frame_path:
             current_fps = self.fps_spin.get_value()
             key = f"sheet:{self.first_frame_path}" if scope == "sheet" else f"dir:{self.dir_path}"
@@ -694,6 +697,9 @@ class ImagePreviewWindow(Gtk.Window):
     def _on_default_mode_changed(self, dropdown, pspec) -> None:
         self.settings["default_mode"] = dropdown.get_selected()
         save_settings(self.settings)
+        
+        # Grab focus back to restore Popover's active grab
+        dropdown.grab_focus()
 
     def _on_mode_changed(self, dropdown, pspec) -> None:
         self.play_direction = 1
