@@ -156,6 +156,15 @@ class ImagePreviewWindow(Gtk.Window):
             btn_export_ico.connect("clicked", self._on_export_ico_clicked, menu_popover)
             menu_box.append(btn_export_ico)
 
+        sep_adv = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        menu_box.append(sep_adv)
+
+        btn_export_adv = Gtk.Button(label="Advanced Export...")
+        btn_export_adv.set_has_frame(False)
+        btn_export_adv.set_halign(Gtk.Align.START)
+        btn_export_adv.connect("clicked", self._on_export_adv_clicked, menu_popover)
+        menu_box.append(btn_export_adv)
+
         sep_menu = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         menu_box.append(sep_menu)
 
@@ -985,6 +994,18 @@ class ImagePreviewWindow(Gtk.Window):
                     
         self._export_image_to(default_name, "webm", save_webm)
 
+    def _on_export_adv_clicked(self, button, popover) -> None:
+        if hasattr(self, "_export_adv_win") and self._export_adv_win is not None:
+            self._export_adv_win.present()
+            popover.popdown()
+            return
+        popover.popdown()
+        self._export_adv_win = ExportOptionsWindow(self)
+        self._export_adv_win.connect(
+            "destroy", lambda w: setattr(self, "_export_adv_win", None)
+        )
+        self._export_adv_win.present()
+
     def present(self) -> None:
         super().present()
         # Schedule setting/clearing focus on presentation to ensure proper startup focus state
@@ -996,3 +1017,330 @@ class ImagePreviewWindow(Gtk.Window):
         else:
             self.set_focus(None)
         return False
+
+
+class ExportOptionsWindow(Gtk.Window):
+    def __init__(self, parent_win) -> None:
+        super().__init__(title="Advanced Export Options")
+        self.set_transient_for(parent_win)
+        self.set_default_size(360, 440)
+        self.parent_win = parent_win
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_start(16)
+        box.set_margin_end(16)
+        box.set_margin_top(16)
+        box.set_margin_bottom(16)
+        self.set_child(box)
+
+        # 1. Format Selection Row
+        format_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        fmt_lbl = Gtk.Label(label="Export Format:")
+        fmt_lbl.set_halign(Gtk.Align.START)
+        fmt_lbl.set_hexpand(True)
+        format_row.append(fmt_lbl)
+        
+        self.formats = ["PNG (Current Frame)", "GIF (Current Frame)", "ICO (Current Frame)"]
+        self.format_keys = ["png_frame", "gif_frame", "ico_frame"]
+        
+        if len(self.parent_win.file_paths) > 1:
+            self.formats.extend(["GIF (Animation)", "WebM (Animation)"])
+            self.format_keys.extend(["gif_anim", "webm_anim"])
+            
+        self.format_dropdown = Gtk.DropDown.new_from_strings(self.formats)
+        self.format_dropdown.set_selected(0)
+        format_row.append(self.format_dropdown)
+        box.append(format_row)
+        
+        sep1 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(sep1)
+
+        # 2. Scaling Options Section
+        scale_lbl_title = Gtk.Label()
+        scale_lbl_title.set_markup("<b>Scaling Options</b>")
+        scale_lbl_title.set_halign(Gtk.Align.START)
+        box.append(scale_lbl_title)
+        
+        scale_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        sc_lbl = Gtk.Label(label="Scale:")
+        sc_lbl.set_halign(Gtk.Align.START)
+        sc_lbl.set_hexpand(True)
+        scale_row.append(sc_lbl)
+        
+        self.scale_dropdown = Gtk.DropDown.new_from_strings(["1x (Original)", "2x", "4x", "8x", "Custom..."])
+        self.scale_dropdown.set_selected(0)
+        self.scale_dropdown.connect("notify::selected", self._on_scale_changed)
+        scale_row.append(self.scale_dropdown)
+        
+        adj_scale = Gtk.Adjustment(value=1.0, lower=1.0, upper=32.0, step_increment=1.0)
+        self.scale_spin = Gtk.SpinButton(adjustment=adj_scale, climb_rate=1.0, digits=0)
+        self.scale_spin.set_visible(False)
+        scale_row.append(self.scale_spin)
+        box.append(scale_row)
+        
+        filter_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        flt_lbl = Gtk.Label(label="Filter:")
+        flt_lbl.set_halign(Gtk.Align.START)
+        flt_lbl.set_hexpand(True)
+        filter_row.append(flt_lbl)
+        
+        self.filter_dropdown = Gtk.DropDown.new_from_strings(["Nearest Neighbor", "Bilinear (Linear)"])
+        self.filter_dropdown.set_selected(0)
+        filter_row.append(self.filter_dropdown)
+        box.append(filter_row)
+        
+        sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(sep2)
+
+        # 3. Palette Options Section
+        palette_lbl_title = Gtk.Label()
+        palette_lbl_title.set_markup("<b>Palette Options</b>")
+        palette_lbl_title.set_halign(Gtk.Align.START)
+        box.append(palette_lbl_title)
+        
+        self.reduce_chk = Gtk.CheckButton(label="Reduce Palette")
+        self.reduce_chk.connect("toggled", self._on_reduce_toggled)
+        box.append(self.reduce_chk)
+        
+        self.palette_sub_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.palette_sub_box.set_margin_start(16)
+        self.palette_sub_box.set_sensitive(False)
+        
+        colors_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        col_lbl = Gtk.Label(label="Max Colors:")
+        col_lbl.set_halign(Gtk.Align.START)
+        col_lbl.set_hexpand(True)
+        colors_row.append(col_lbl)
+        
+        adj_colors = Gtk.Adjustment(value=16.0, lower=2.0, upper=256.0, step_increment=1.0)
+        self.colors_spin = Gtk.SpinButton(adjustment=adj_colors, climb_rate=1.0, digits=0)
+        colors_row.append(self.colors_spin)
+        self.palette_sub_box.append(colors_row)
+        
+        self.shared_chk = Gtk.CheckButton(label="Shared Palette (Across Frames)")
+        self.shared_chk.set_active(True)
+        if len(self.parent_win.file_paths) <= 1:
+            self.shared_chk.set_sensitive(False)
+            self.shared_chk.set_active(False)
+        self.palette_sub_box.append(self.shared_chk)
+        box.append(self.palette_sub_box)
+        
+        self.ansi_chk = Gtk.CheckButton(label="Map to ANSI 256 Colors")
+        self.ansi_chk.connect("toggled", self._on_ansi_toggled)
+        box.append(self.ansi_chk)
+        
+        sep3 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(sep3)
+
+        # 4. Action Buttons (Cancel / Export)
+        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        btn_row.set_halign(Gtk.Align.END)
+        
+        btn_cancel = Gtk.Button(label="Cancel")
+        btn_cancel.connect("clicked", lambda b: self.close())
+        btn_row.append(btn_cancel)
+        
+        btn_export = Gtk.Button(label="Export...")
+        btn_export.add_css_class("suggested-action")
+        btn_export.connect("clicked", self._on_export_clicked)
+        btn_row.append(btn_export)
+        box.append(btn_row)
+
+        # Close window when ESC key is pressed
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self._on_key_pressed)
+        self.add_controller(key_controller)
+
+    def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        return False
+
+    def _on_scale_changed(self, dropdown, pspec) -> None:
+        idx = dropdown.get_selected()
+        self.scale_spin.set_visible(idx == 4)
+
+    def _on_reduce_toggled(self, button) -> None:
+        active = button.get_active()
+        self.palette_sub_box.set_sensitive(active)
+        if active:
+            self.ansi_chk.set_active(False)
+
+    def _on_ansi_toggled(self, button) -> None:
+        active = button.get_active()
+        if active:
+            self.reduce_chk.set_active(False)
+
+    def _apply_ansi_mapping(self, img: "Image.Image") -> "Image.Image":
+        from PIL import Image
+        from sprite_view.utils import get_ansi_256_colors
+        
+        ansi_colors = get_ansi_256_colors()
+        palette_data = []
+        for r, g, b in ansi_colors:
+            palette_data.extend([r, g, b])
+        while len(palette_data) < 768:
+            palette_data.append(0)
+            
+        ansi_p_img = Image.new('P', (1, 1))
+        ansi_p_img.putpalette(palette_data)
+        
+        alpha = img.getchannel('A')
+        rgb_img = img.convert('RGB')
+        quant = rgb_img.quantize(palette=ansi_p_img, dither=Image.Dither.NONE)
+        rgba = quant.convert('RGBA')
+        rgba.putalpha(alpha)
+        return rgba
+
+    def _apply_shared_palette_reduction(self, frames: list, max_colors: int) -> list:
+        from PIL import Image
+        widths, heights = zip(*(img.size for img in frames))
+        max_w = max(widths)
+        total_h = sum(heights)
+        
+        combined = Image.new("RGBA", (max_w, total_h), (0, 0, 0, 0))
+        y = 0
+        for img in frames:
+            combined.paste(img, (0, y))
+            y += img.height
+            
+        master_p = combined.quantize(colors=max_colors)
+        
+        quantized_frames = []
+        for img in frames:
+            alpha = img.getchannel('A')
+            rgb_img = img.convert('RGB')
+            quant = rgb_img.quantize(palette=master_p, dither=Image.Dither.NONE)
+            rgba = quant.convert('RGBA')
+            rgba.putalpha(alpha)
+            quantized_frames.append(rgba)
+            
+        return quantized_frames
+
+    def _on_export_clicked(self, button) -> None:
+        fmt_idx = self.format_dropdown.get_selected()
+        fmt_key = self.format_keys[fmt_idx]
+        
+        ext = "png"
+        if "gif" in fmt_key:
+            ext = "gif"
+        elif "ico" in fmt_key:
+            ext = "ico"
+        elif "webm" in fmt_key:
+            ext = "webm"
+            
+        if "anim" in fmt_key:
+            default_name = self.parent_win._get_default_animation_name(ext)
+        else:
+            current_path = self.parent_win.file_paths[self.parent_win.current_frame]
+            base = os.path.basename(current_path)
+            name, _ = os.path.splitext(base)
+            default_name = f"{name}.{ext}"
+            
+        scale_idx = self.scale_dropdown.get_selected()
+        if scale_idx == 0:
+            scale_val = 1
+        elif scale_idx == 1:
+            scale_val = 2
+        elif scale_idx == 2:
+            scale_val = 4
+        elif scale_idx == 3:
+            scale_val = 8
+        else:
+            scale_val = int(self.scale_spin.get_value())
+            
+        filter_idx = self.filter_dropdown.get_selected()
+        filter_type = "nearest" if filter_idx == 0 else "linear"
+        
+        reduce_palette = self.reduce_chk.get_active()
+        max_colors = int(self.colors_spin.get_value())
+        shared_palette = self.shared_chk.get_active() and len(self.parent_win.file_paths) > 1
+        
+        map_ansi = self.ansi_chk.get_active()
+        
+        def process_and_save(dest_path):
+            from PIL import Image
+            
+            # 1. Get original 1x frames
+            frames = [self.parent_win._get_pil_image(i, pad_to_canvas=True) for i in range(len(self.parent_win.file_paths))]
+            
+            # 2. Apply color quantization / mapping at 1x resolution with no dithering
+            if reduce_palette:
+                if shared_palette and len(frames) > 1:
+                    frames = self._apply_shared_palette_reduction(frames, max_colors)
+                else:
+                    new_frames = []
+                    for img in frames:
+                        alpha = img.getchannel('A')
+                        rgb_img = img.convert('RGB')
+                        quant = rgb_img.quantize(colors=max_colors, dither=Image.Dither.NONE)
+                        rgba = quant.convert('RGBA')
+                        rgba.putalpha(alpha)
+                        new_frames.append(rgba)
+                    frames = new_frames
+            elif map_ansi:
+                frames = [self._apply_ansi_mapping(img) for img in frames]
+                
+            # 3. Scale up the processed frames
+            if scale_val != 1:
+                resample = Image.Resampling.NEAREST if filter_type == "nearest" else Image.Resampling.BILINEAR
+                new_frames = []
+                for img in frames:
+                    w, h = img.size
+                    new_frames.append(img.resize((w * scale_val, h * scale_val), resample))
+                frames = new_frames
+                
+            # 4. Save to destination path
+            if "anim" in fmt_key:
+                fps = self.parent_win.fps_spin.get_value()
+                duration_ms = int(1000.0 / fps)
+                
+                if ext == "gif":
+                    frames[0].save(
+                        dest_path,
+                        "GIF",
+                        save_all=True,
+                        append_images=frames[1:],
+                        duration=duration_ms,
+                        loop=0
+                    )
+                elif ext == "webm":
+                    import tempfile
+                    import subprocess
+                    
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        for i, frame in enumerate(frames):
+                            frame_path = os.path.join(tmpdir, f"frame_{i:04d}.png")
+                            frame.save(frame_path, "PNG")
+                            
+                        cmd = [
+                            "ffmpeg", "-y",
+                            "-framerate", str(fps),
+                            "-i", os.path.join(tmpdir, "frame_%04d.png"),
+                            "-c:v", "libvpx-vp9",
+                            "-pix_fmt", "yuva420p",
+                            dest_path
+                        ]
+                        res = subprocess.run(cmd, capture_output=True)
+                        if res.returncode != 0:
+                            raise Exception(f"ffmpeg error: {res.stderr.decode()}")
+            else:
+                # Single frame export
+                frame = frames[self.parent_win.current_frame]
+                
+                if ext == "png":
+                    frame.save(dest_path, "PNG")
+                elif ext == "gif":
+                    frame.save(dest_path, "GIF")
+                elif ext == "ico":
+                    w, h = frame.size
+                    if w > 256 or h > 256:
+                        ratio = min(256 / w, 256 / h)
+                        new_w, new_h = int(w * ratio), int(h * ratio)
+                        resample = Image.Resampling.NEAREST if filter_type == "nearest" else Image.Resampling.LANCZOS
+                        frame = frame.resize((new_w, new_h), resample)
+                    frame.save(dest_path, format="ICO")
+                    
+        self.close()
+        self.parent_win._export_image_to(default_name, ext, process_and_save)
