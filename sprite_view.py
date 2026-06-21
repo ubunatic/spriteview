@@ -179,6 +179,7 @@ def load_settings() -> dict:
         print(f"Error loading settings: {e}")
     return {
         "default_fps": 15.0,
+        "default_mode": 0,
         "remember_fps": True,
         "remember_scope": "sheet",
         "saved_fps": {}
@@ -275,6 +276,22 @@ class ImagePreviewWindow(Gtk.Window):
         self.scope_dropdown.connect("notify::selected", self._on_remember_scope_changed)
         scope_row.append(self.scope_dropdown)
         popover_box.append(scope_row)
+
+        # Separator
+        sep_mode = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        popover_box.append(sep_mode)
+
+        # 4. Default Mode Row
+        default_mode_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        dm_lbl = Gtk.Label(label="Default Mode:")
+        dm_lbl.set_halign(Gtk.Align.START)
+        default_mode_row.append(dm_lbl)
+
+        self.default_mode_dropdown = Gtk.DropDown.new_from_strings(["Loop", "Ping-Pong", "Once"])
+        self.default_mode_dropdown.set_selected(self.settings.get("default_mode", 0))
+        self.default_mode_dropdown.connect("notify::selected", self._on_default_mode_changed)
+        default_mode_row.append(self.default_mode_dropdown)
+        popover_box.append(default_mode_row)
 
         popover.set_child(popover_box)
         menu_button.set_popover(popover)
@@ -542,7 +559,7 @@ class ImagePreviewWindow(Gtk.Window):
         settings_box.append(mode_lbl)
         
         self.mode_dropdown = Gtk.DropDown.new_from_strings(["Loop", "Ping-Pong", "Once"])
-        self.mode_dropdown.set_selected(0)  # Default: Loop
+        self.mode_dropdown.set_selected(self.settings.get("default_mode", 0))
         self.mode_dropdown.connect("notify::selected", self._on_mode_changed)
         settings_box.append(self.mode_dropdown)
         
@@ -672,6 +689,10 @@ class ImagePreviewWindow(Gtk.Window):
             key = f"sheet:{self.first_frame_path}" if scope == "sheet" else f"dir:{self.dir_path}"
             self.settings.setdefault("saved_fps", {})[key] = current_fps
             
+        save_settings(self.settings)
+
+    def _on_default_mode_changed(self, dropdown, pspec) -> None:
+        self.settings["default_mode"] = dropdown.get_selected()
         save_settings(self.settings)
 
     def _on_mode_changed(self, dropdown, pspec) -> None:
