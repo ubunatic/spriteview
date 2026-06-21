@@ -7,7 +7,7 @@ set -euo pipefail
 orig_size=$(gsettings get org.gnome.nautilus.window-state initial-size)
 
 # 2. Set temporary small size
-gsettings set org.gnome.nautilus.window-state initial-size '(600, 400)'
+gsettings set org.gnome.nautilus.window-state initial-size '(480, 640)'
 
 # 3. Launch Nautilus in the background
 nautilus --no-desktop sprites &
