@@ -2,7 +2,6 @@
 
 EXTENSION_NAME := sprite_view.py
 INSTALL_SCRIPT := scripts/install.sh
-GEOMETRY       ?= 800x600       # overridable nautilus window geometry
 
 help: ⚙️  ## show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | \
@@ -12,7 +11,7 @@ open: ⚙️  ## open sprites dir using "open"
 	open sprites
 
 nautilus: ⚙️  ## open sprites dir using "nautilus" directly
-	nautilus --no-desktop --geometry=$(GEOMETRY) sprites
+	nautilus --no-desktop sprites
 
 dev: ⚙️test install nautilus
 
