@@ -11,7 +11,7 @@ class AboutWindow(Gtk.AboutDialog):
     def __init__(self, parent_win) -> None:
         super().__init__()
         self.set_transient_for(parent_win)
-        self.set_modal(True)
+
         self.set_program_name("Nautilus Sprite View")
         self.set_version("1.0.0")
         self.set_comments("A lightweight sprite sheet and animation frame previewer for Nautilus.")

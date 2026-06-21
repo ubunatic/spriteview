@@ -11,7 +11,6 @@ class SettingsWindow(Gtk.Window):
     def __init__(self, parent_win) -> None:
         super().__init__(title="Settings")
         self.set_transient_for(parent_win)
-        self.set_modal(True)
         self.set_default_size(320, 240)
         self.parent_win = parent_win
         self.settings = parent_win.settings
@@ -76,6 +75,32 @@ class SettingsWindow(Gtk.Window):
         default_mode_row.append(self.default_mode_dropdown)
         box.append(default_mode_row)
 
+        sep_seps = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(sep_seps)
+
+        # 5. Sequence Separators
+        seps_lbl = Gtk.Label(label="Sequence Separators:")
+        seps_lbl.set_halign(Gtk.Align.START)
+        box.append(seps_lbl)
+
+        self.sep_chips_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.sep_chips_box.set_halign(Gtk.Align.START)
+        box.append(self.sep_chips_box)
+        self._rebuild_sep_chips()
+
+        sep_add_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        sep_add_row.set_halign(Gtk.Align.START)
+        self.sep_entry = Gtk.Entry()
+        self.sep_entry.set_max_length(8)
+        self.sep_entry.set_placeholder_text("new…")
+        self.sep_entry.set_width_chars(8)
+        self.sep_entry.connect("activate", self._on_sep_add)
+        sep_add_row.append(self.sep_entry)
+        sep_add_btn = Gtk.Button(label="+")
+        sep_add_btn.connect("clicked", self._on_sep_add)
+        sep_add_row.append(sep_add_btn)
+        box.append(sep_add_row)
+
         # Close window when ESC key is pressed
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)
@@ -119,6 +144,42 @@ class SettingsWindow(Gtk.Window):
     def _on_default_mode_changed(self, dropdown, pspec) -> None:
         self.settings["default_mode"] = dropdown.get_selected()
         save_settings(self.settings)
+
+    def _rebuild_sep_chips(self) -> None:
+        child = self.sep_chips_box.get_first_child()
+        while child is not None:
+            nxt = child.get_next_sibling()
+            self.sep_chips_box.remove(child)
+            child = nxt
+        for sep in self.settings.get("sequence_separators", ["_", "-"]):
+            chip = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+            chip.add_css_class("sep-chip")
+            chip.append(Gtk.Label(label=sep))
+            rm = Gtk.Button(label="×")
+            rm.set_has_frame(False)
+            rm.connect("clicked", self._on_sep_remove, sep)
+            chip.append(rm)
+            self.sep_chips_box.append(chip)
+
+    def _on_sep_add(self, widget) -> None:
+        text = self.sep_entry.get_text()
+        if not text:
+            return
+        seps = list(self.settings.get("sequence_separators", ["_", "-"]))
+        if text not in seps:
+            seps.append(text)
+            self.settings["sequence_separators"] = seps
+            save_settings(self.settings)
+            self._rebuild_sep_chips()
+        self.sep_entry.set_text("")
+
+    def _on_sep_remove(self, btn, sep) -> None:
+        seps = list(self.settings.get("sequence_separators", ["_", "-"]))
+        if sep in seps:
+            seps.remove(sep)
+            self.settings["sequence_separators"] = seps
+            save_settings(self.settings)
+            self._rebuild_sep_chips()
 
     def present(self) -> None:
         super().present()

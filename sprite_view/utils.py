@@ -12,20 +12,25 @@ def format_size(bytes_size: int) -> str:
         bytes_size /= 1024
     return f"{bytes_size:.1f} TB"
 
-def find_sprite_frames(file_path: str) -> List[str]:
+def find_sprite_frames(file_path: str, separators: List[str] = None) -> List[str]:
+    if not separators:
+        separators = ["_", "-"]
+
     dir_name = os.path.dirname(file_path)
     base_name = os.path.basename(file_path)
-    
-    # Matches patterns like prefix_0001.png, prefix_001.png, prefix_01.png
-    match = re.match(r"^(.*)_([0-9]{2,4})\.(png|gif|bmp|jpg|jpeg|webp)$", base_name, re.IGNORECASE)
+
+    # Build alternation from separator list so users can configure extra separators
+    sep_alts = "|".join(re.escape(s) for s in separators)
+    match = re.match(rf"^(.*)({sep_alts})([0-9]{{2,4}})\.(png|gif|bmp|jpg|jpeg|webp)$", base_name, re.IGNORECASE)
     if not match:
         return [file_path]
 
     prefix = match.group(1)
-    ext = match.group(3)
-    digit_len = len(match.group(2))
+    sep = match.group(2)
+    ext = match.group(4)
+    digit_len = len(match.group(3))
 
-    pattern = re.compile(rf"^{re.escape(prefix)}_([0-9]{{{digit_len}}})\.{ext}$", re.IGNORECASE)
+    pattern = re.compile(rf"^{re.escape(prefix)}{re.escape(sep)}([0-9]{{{digit_len}}})\.{ext}$", re.IGNORECASE)
     
     frames = []
     try:

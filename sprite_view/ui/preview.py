@@ -15,6 +15,8 @@ from sprite_view.settings import load_settings, save_settings
 from sprite_view.ui.about import AboutWindow
 from sprite_view.ui.settings import SettingsWindow
 
+_ALIGN_LABELS = ["↖", "↑", "↗", "←", "·", "→", "↙", "↓", "↘"]
+
 def init_css():
     display = Gdk.Display.get_default()
     if display:
@@ -27,6 +29,15 @@ def init_css():
             .thumb-btn {
                 padding: 2px;
                 margin: 4px;
+            }
+            .align-active {
+                background: alpha(currentColor, 0.25);
+                border: 1px solid alpha(currentColor, 0.5);
+            }
+            .sep-chip {
+                border: 1px solid alpha(currentColor, 0.3);
+                border-radius: 4px;
+                padding: 2px 4px;
             }
         """)
         Gtk.StyleContext.add_provider_for_display(
@@ -102,10 +113,14 @@ class ImagePreviewWindow(Gtk.Window):
 
         self.textures: List[Gdk.Texture] = []
         self.thumb_buttons: List[Gtk.Button] = []
+        self.thumb_pics: List[Gtk.Picture] = []
         self.original_dimensions = []
+        self.original_pixbufs: List[GdkPixbuf.Pixbuf] = []
         self.frame_palettes = []
         self.swatch_colors = [(0, 0, 0, 255)] * 16
         self.selected_color = (0, 0, 0, 255)
+        self.current_align = 4  # center
+        self.align_btns: List[Gtk.Button] = []
         
         try:
             self.current_frame = file_paths.index(selected_file_path)
@@ -138,30 +153,33 @@ class ImagePreviewWindow(Gtk.Window):
         right_box.set_size_request(240, -1)
         paned.set_end_child(right_box)
 
-        # Load all images
+        # Phase 1: decode originals and extract palettes
+        loaded_paths = []
         for path in file_paths:
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
-                w = pixbuf.get_width()
-                h = pixbuf.get_height()
-                self.original_dimensions.append((w, h))
-
-                # Extract and store color palette from original frame image
-                palette = self._extract_palette_from_pixbuf(pixbuf, 16)
-                self.frame_palettes.append(palette)
-
-                # Upscale using nearest neighbor if it's small pixel image
-                if path.lower().endswith(('.png', '.gif', '.bmp')) and (w < 1024 or h < 1024):
-                    scale_factor = max(1, min(1024 // w, 1024 // h))
-                    if scale_factor > 1:
-                        new_w = w * scale_factor
-                        new_h = h * scale_factor
-                        pixbuf = pixbuf.scale_simple(new_w, new_h, GdkPixbuf.InterpType.NEAREST)
-
-                texture = Gdk.Texture.new_for_pixbuf(pixbuf)
-                self.textures.append(texture)
+                self.original_dimensions.append((pixbuf.get_width(), pixbuf.get_height()))
+                self.frame_palettes.append(self._extract_palette_from_pixbuf(pixbuf, 16))
+                self.original_pixbufs.append(pixbuf)
+                loaded_paths.append(path)
             except Exception as e:
                 print(f"Error loading frame {path}: {e}")
+        self.file_paths = loaded_paths
+        self.first_frame_path = loaded_paths[0] if loaded_paths else ""
+        self.dir_path = os.path.dirname(self.first_frame_path) if self.first_frame_path else ""
+
+        # Detect mixed frame sizes and compute bounding-box canvas
+        if self.original_dimensions:
+            widths = [d[0] for d in self.original_dimensions]
+            heights = [d[1] for d in self.original_dimensions]
+            self.has_mixed_sizes = len(set(widths)) > 1 or len(set(heights)) > 1
+            self.canvas_size = (max(widths), max(heights))
+        else:
+            self.has_mixed_sizes = False
+            self.canvas_size = (0, 0)
+
+        # Phase 2: pad (if mixed) + upscale + create textures
+        self._build_textures(self.current_align)
 
         if not self.textures:
             label = Gtk.Label(label="Error: Could not load any images.")
@@ -368,7 +386,24 @@ class ImagePreviewWindow(Gtk.Window):
         self.mode_dropdown.set_selected(self.settings.get("default_mode", 0))
         self.mode_dropdown.connect("notify::selected", self._on_mode_changed)
         settings_box.append(self.mode_dropdown)
-        
+
+        # 3×3 alignment grid — only visible for mixed-size sequences
+        align_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        align_box.append(Gtk.Label(label="Align:"))
+        align_grid = Gtk.Grid()
+        align_grid.set_row_spacing(1)
+        align_grid.set_column_spacing(1)
+        for i, lbl in enumerate(_ALIGN_LABELS):
+            btn = Gtk.Button(label=lbl)
+            btn.set_size_request(26, 26)
+            btn.connect("clicked", self._on_align_btn_clicked, i)
+            align_grid.attach(btn, i % 3, i // 3, 1, 1)
+            self.align_btns.append(btn)
+        self.align_btns[self.current_align].add_css_class("align-active")
+        align_box.append(align_grid)
+        align_box.set_visible(self.has_mixed_sizes)
+        settings_box.append(align_box)
+
         left_box.append(settings_box)
 
         # Setup Sprite Sheet (ScrolledWindow containing horizontal Box)
@@ -396,6 +431,7 @@ class ImagePreviewWindow(Gtk.Window):
             btn_thumb.connect("clicked", self._on_thumb_clicked, idx)
             thumbs_box.append(btn_thumb)
             self.thumb_buttons.append(btn_thumb)
+            self.thumb_pics.append(thumb_pic)
 
         self._update_frame()
         self.connect("destroy", self._on_destroy)
@@ -604,7 +640,11 @@ class ImagePreviewWindow(Gtk.Window):
         
         try:
             orig_w, orig_h = self.original_dimensions[self.current_frame]
-            self.lbl_info_dimensions.set_label(f"{orig_w} × {orig_h} px")
+            if self.has_mixed_sizes:
+                cw, ch = self.canvas_size
+                self.lbl_info_dimensions.set_label(f"{orig_w} × {orig_h} px (canvas: {cw} × {ch})")
+            else:
+                self.lbl_info_dimensions.set_label(f"{orig_w} × {orig_h} px")
             
             size_bytes = os.path.getsize(current_path)
             self.lbl_info_filesize.set_label(format_size(size_bytes))
@@ -633,6 +673,43 @@ class ImagePreviewWindow(Gtk.Window):
                     btn.add_css_class("active-frame")
                 else:
                     btn.remove_css_class("active-frame")
+
+    def _pad_pixbuf(self, pixbuf: GdkPixbuf.Pixbuf, canvas_w: int, canvas_h: int, align: int) -> GdkPixbuf.Pixbuf:
+        src_w = pixbuf.get_width()
+        src_h = pixbuf.get_height()
+        if src_w == canvas_w and src_h == canvas_h:
+            return pixbuf
+        canvas = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, canvas_w, canvas_h)
+        canvas.fill(0x00000000)
+        row, col = align // 3, align % 3
+        dx = (canvas_w - src_w) * col // 2
+        dy = (canvas_h - src_h) * row // 2
+        pixbuf.copy_area(0, 0, src_w, src_h, canvas, dx, dy)
+        return canvas
+
+    def _build_textures(self, align: int) -> None:
+        self.textures = []
+        canvas_w, canvas_h = self.canvas_size
+        for i, pixbuf in enumerate(self.original_pixbufs):
+            pb = self._pad_pixbuf(pixbuf, canvas_w, canvas_h, align) if self.has_mixed_sizes else pixbuf
+            w, h = pb.get_width(), pb.get_height()
+            path = self.file_paths[i] if i < len(self.file_paths) else ""
+            if path.lower().endswith(('.png', '.gif', '.bmp')) and (w < 1024 or h < 1024):
+                scale_factor = max(1, min(1024 // w, 1024 // h))
+                if scale_factor > 1:
+                    pb = pb.scale_simple(w * scale_factor, h * scale_factor, GdkPixbuf.InterpType.NEAREST)
+            self.textures.append(Gdk.Texture.new_for_pixbuf(pb))
+
+    def _on_align_btn_clicked(self, button: Gtk.Button, align: int) -> None:
+        if align == self.current_align:
+            return
+        self.align_btns[self.current_align].remove_css_class("align-active")
+        self.current_align = align
+        self.align_btns[align].add_css_class("align-active")
+        self._build_textures(align)
+        self.picture.set_paintable(self.textures[self.current_frame])
+        for i, thumb_pic in enumerate(self.thumb_pics):
+            thumb_pic.set_paintable(self.textures[i])
 
     def present(self) -> None:
         super().present()

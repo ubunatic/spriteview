@@ -72,6 +72,46 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(frames, ["/path/to/dir/sprite_001.png"])
 
     @patch("os.listdir")
+    def test_find_sprite_frames_hyphen_separator(self, mock_listdir):
+        mock_listdir.return_value = [
+            "screen-sheet-001.png",
+            "screen-sheet-002.png",
+            "screen-sheet-003.png",
+            "other_file.png",
+        ]
+        frames = find_sprite_frames("/path/to/dir/screen-sheet-001.png")
+        self.assertEqual(len(frames), 3)
+        self.assertEqual(frames[0], "/path/to/dir/screen-sheet-001.png")
+        self.assertEqual(frames[2], "/path/to/dir/screen-sheet-003.png")
+
+    @patch("os.listdir")
+    def test_find_sprite_frames_custom_separator(self, mock_listdir):
+        mock_listdir.return_value = [
+            "sprite.001.png",
+            "sprite.002.png",
+            "sprite.003.png",
+        ]
+        frames = find_sprite_frames("/path/to/dir/sprite.001.png", separators=[".", "_"])
+        self.assertEqual(len(frames), 3)
+        self.assertEqual(frames[0], "/path/to/dir/sprite.001.png")
+
+    @patch("os.listdir")
+    def test_find_sprite_frames_no_match_empty_separators(self, mock_listdir):
+        mock_listdir.return_value = ["sprite_001.png"]
+        frames = find_sprite_frames("/path/to/dir/sprite_001.png", separators=[])
+        self.assertEqual(frames, ["/path/to/dir/sprite_001.png"])
+
+    @patch("os.listdir")
+    def test_find_sprite_frames_no_cross_sep_match(self, mock_listdir):
+        # hyphen-separated should not match underscore-separated files
+        mock_listdir.return_value = [
+            "sprite_001.png",
+            "sprite_002.png",
+        ]
+        frames = find_sprite_frames("/path/to/dir/sprite-001.png")
+        self.assertEqual(frames, ["/path/to/dir/sprite-001.png"])
+
+    @patch("os.listdir")
     def test_find_sprite_frames_no_match(self, mock_listdir):
         mock_listdir.return_value = [
             "sprite_0001.png",

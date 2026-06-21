@@ -18,6 +18,7 @@ def load_settings() -> dict:
         "default_mode": 0,
         "remember_fps": True,
         "remember_scope": "sheet",
+        "sequence_separators": ["_", "-"],
         "saved_fps": {}
     }
 

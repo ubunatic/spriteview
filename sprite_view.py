@@ -11,6 +11,7 @@ from gi.repository import Nautilus, GObject, Notify, Gtk
 
 from sprite_view.utils import find_sprite_frames
 from sprite_view.ui.preview import ImagePreviewWindow
+from sprite_view.settings import load_settings
 
 class NautilusPreview(GObject.GObject, Nautilus.MenuProvider):
     def __init__(self) -> None:
@@ -36,8 +37,9 @@ class NautilusPreview(GObject.GObject, Nautilus.MenuProvider):
                 self._show_notification("Preview Error", f"File path does not exist: {file_path}")
                 return
 
-            # Find all sprite frames
-            frames = find_sprite_frames(file_path)
+            # Find all sprite frames using configured separators
+            seps = load_settings().get("sequence_separators", ["_", "-"])
+            frames = find_sprite_frames(file_path, seps)
             selected_file_path = file_path
             title = f"Preview: {os.path.basename(file_path)}"
         else:
@@ -88,7 +90,8 @@ class NautilusPreview(GObject.GObject, Nautilus.MenuProvider):
             file = image_files[0]
             file_path = file.get_location().get_path()
             label = "Preview Image"
-            if len(find_sprite_frames(file_path)) > 1:
+            seps = load_settings().get("sequence_separators", ["_", "-"])
+            if len(find_sprite_frames(file_path, seps)) > 1:
                 label = "Preview Sprite Sheet"
 
             item = Nautilus.MenuItem(
