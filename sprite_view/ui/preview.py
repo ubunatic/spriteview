@@ -138,6 +138,9 @@ def init_css():
                 border-radius: 4px;
                 padding: 2px 4px;
             }
+            .monospace {
+                font-family: monospace;
+            }
         """)
         Gtk.StyleContext.add_provider_for_display(
             display,
@@ -882,6 +885,23 @@ class ImagePreviewWindow(Gtk.Window):
             return f"animation.{ext}"
         first_file = os.path.basename(self.file_paths[0])
         import re
+        from sprite_view.utils import template_to_regex
+        
+        patterns = self.settings.get("sequence_patterns", [])
+        if patterns:
+            for pat_str in patterns:
+                try:
+                    pat_regex_str = template_to_regex(pat_str)
+                    pat = re.compile(pat_regex_str, re.IGNORECASE)
+                    match = pat.match(first_file)
+                    if match:
+                        if "prefix" in pat.groupindex:
+                            prefix = match.group("prefix")
+                            if prefix:
+                                return f"{prefix}.{ext}"
+                except Exception as e:
+                    print(f"Error matching pattern '{pat_str}': {e}")
+
         seps = self.settings.get("sequence_separators", ["_", "-"])
         sep_alts = "|".join(re.escape(s) for s in seps)
         match = re.match(rf"^(.*)({sep_alts})([0-9]{{2,4}})\.(png|gif|bmp|jpg|jpeg|webp)$", first_file, re.IGNORECASE)

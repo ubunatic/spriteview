@@ -37,9 +37,11 @@ class NautilusPreview(GObject.GObject, Nautilus.MenuProvider):
                 self._show_notification("Preview Error", f"File path does not exist: {file_path}")
                 return
 
-            # Find all sprite frames using configured separators
-            seps = load_settings().get("sequence_separators", ["_", "-"])
-            frames = find_sprite_frames(file_path, seps)
+            # Find all sprite frames using configured separators and patterns
+            settings = load_settings()
+            seps = settings.get("sequence_separators", ["_", "-"])
+            pats = settings.get("sequence_patterns", [])
+            frames = find_sprite_frames(file_path, separators=seps, patterns=pats)
             selected_file_path = file_path
             title = f"Preview: {os.path.basename(file_path)}"
         else:
@@ -90,8 +92,10 @@ class NautilusPreview(GObject.GObject, Nautilus.MenuProvider):
             file = image_files[0]
             file_path = file.get_location().get_path()
             label = "Preview Image"
-            seps = load_settings().get("sequence_separators", ["_", "-"])
-            if len(find_sprite_frames(file_path, seps)) > 1:
+            settings = load_settings()
+            seps = settings.get("sequence_separators", ["_", "-"])
+            pats = settings.get("sequence_patterns", [])
+            if len(find_sprite_frames(file_path, separators=seps, patterns=pats)) > 1:
                 label = "Preview Sprite Sheet"
 
             item = Nautilus.MenuItem(

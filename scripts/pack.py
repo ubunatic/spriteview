@@ -35,7 +35,8 @@ gi.require_version('Notify', '0.7')
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('GdkPixbuf', '2.0')
-from gi.repository import Nautilus, GObject, Notify, Gtk, Gdk, GdkPixbuf, GLib, Gio
+gi.require_version('Pango', '1.0')
+from gi.repository import Nautilus, GObject, Notify, Gtk, Gdk, GdkPixbuf, GLib, Gio, Pango
 """
 
 def clean_file_content(file_path: str) -> str:

@@ -4,14 +4,14 @@
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk, Gdk, GLib, Pango
 from sprite_view.settings import save_settings
 
 class SettingsWindow(Gtk.Window):
     def __init__(self, parent_win) -> None:
         super().__init__(title="Settings")
         self.set_transient_for(parent_win)
-        self.set_default_size(320, 240)
+        self.set_default_size(450, -1)
         self.parent_win = parent_win
         self.settings = parent_win.settings
 
@@ -91,6 +91,7 @@ class SettingsWindow(Gtk.Window):
         sep_add_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         sep_add_row.set_halign(Gtk.Align.START)
         self.sep_entry = Gtk.Entry()
+        self.sep_entry.add_css_class("monospace")
         self.sep_entry.set_max_length(8)
         self.sep_entry.set_placeholder_text("new…")
         self.sep_entry.set_width_chars(8)
@@ -100,6 +101,32 @@ class SettingsWindow(Gtk.Window):
         sep_add_btn.connect("clicked", self._on_sep_add)
         sep_add_row.append(sep_add_btn)
         box.append(sep_add_row)
+
+        sep_pats = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(sep_pats)
+
+        # 6. Sequence Patterns
+        pats_lbl = Gtk.Label(label="Sequence Patterns:")
+        pats_lbl.set_halign(Gtk.Align.START)
+        box.append(pats_lbl)
+
+        self.pat_list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self.pat_list_box.set_halign(Gtk.Align.FILL)
+        box.append(self.pat_list_box)
+        self._rebuild_pat_list()
+
+        pat_add_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        pat_add_row.set_halign(Gtk.Align.FILL)
+        self.pat_entry = Gtk.Entry()
+        self.pat_entry.add_css_class("monospace")
+        self.pat_entry.set_placeholder_text("e.g. {prefix}_{number}…")
+        self.pat_entry.set_hexpand(True)
+        self.pat_entry.connect("activate", self._on_pat_add)
+        pat_add_row.append(self.pat_entry)
+        pat_add_btn = Gtk.Button(label="+")
+        pat_add_btn.connect("clicked", self._on_pat_add)
+        pat_add_row.append(pat_add_btn)
+        box.append(pat_add_row)
 
         # Connect explicit close-request to direct destroy call
         self.connect("close-request", self._on_close_request)
@@ -161,7 +188,9 @@ class SettingsWindow(Gtk.Window):
         for sep in self.settings.get("sequence_separators", ["_", "-"]):
             chip = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
             chip.add_css_class("sep-chip")
-            chip.append(Gtk.Label(label=sep))
+            lbl = Gtk.Label(label=sep)
+            lbl.add_css_class("monospace")
+            chip.append(lbl)
             rm = Gtk.Button(label="×")
             rm.set_has_frame(False)
             rm.connect("clicked", self._on_sep_remove, sep)
@@ -187,6 +216,69 @@ class SettingsWindow(Gtk.Window):
             self.settings["sequence_separators"] = seps
             save_settings(self.settings)
             self._rebuild_sep_chips()
+
+    def _rebuild_pat_list(self) -> None:
+        child = self.pat_list_box.get_first_child()
+        while child is not None:
+            nxt = child.get_next_sibling()
+            self.pat_list_box.remove(child)
+            child = nxt
+        for pat in self.settings.get("sequence_patterns", []):
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            row.set_hexpand(True)
+            
+            lbl = Gtk.Label(label=pat)
+            lbl.add_css_class("monospace")
+            lbl.set_halign(Gtk.Align.START)
+            lbl.set_hexpand(True)
+            lbl.set_ellipsize(Pango.EllipsizeMode.END)
+            lbl.set_tooltip_text(pat)
+            row.append(lbl)
+            
+            rm = Gtk.Button(label="×")
+            rm.set_has_frame(False)
+            rm.connect("clicked", self._on_pat_remove, pat)
+            row.append(rm)
+            
+            self.pat_list_box.append(row)
+
+    def _on_pat_add(self, widget) -> None:
+        text = self.pat_entry.get_text().strip()
+        if not text:
+            return
+        
+        # Validate template contains {number}
+        if "{number}" not in text:
+            self.pat_entry.set_text("")
+            self.pat_entry.set_placeholder_text("Must contain '{number}'!")
+            return
+        
+        # Validate it generates a valid regex
+        try:
+            from sprite_view.utils import template_to_regex
+            import re
+            re.compile(template_to_regex(text))
+        except Exception:
+            self.pat_entry.set_text("")
+            self.pat_entry.set_placeholder_text("Invalid template expression!")
+            return
+
+        pats = list(self.settings.get("sequence_patterns", []))
+        if text not in pats:
+            pats.append(text)
+            self.settings["sequence_patterns"] = pats
+            save_settings(self.settings)
+            self._rebuild_pat_list()
+        self.pat_entry.set_text("")
+        self.pat_entry.set_placeholder_text("e.g. {prefix}_{number}…")
+
+    def _on_pat_remove(self, btn, pat) -> None:
+        pats = list(self.settings.get("sequence_patterns", []))
+        if pat in pats:
+            pats.remove(pat)
+            self.settings["sequence_patterns"] = pats
+            save_settings(self.settings)
+            self._rebuild_pat_list()
 
     def present(self) -> None:
         super().present()

@@ -121,6 +121,40 @@ class TestUtils(unittest.TestCase):
         frames = find_sprite_frames("/path/to/dir/other_file.png")
         self.assertEqual(frames, ["/path/to/dir/other_file.png"])
 
+    @patch("os.listdir")
+    def test_find_sprite_frames_with_custom_patterns_matched(self, mock_listdir):
+        mock_listdir.return_value = [
+            "walk01.png",
+            "walk02.png",
+            "walk03.png",
+            "other_file.png",
+        ]
+        patterns = [
+            "{prefix}{number}"
+        ]
+        frames = find_sprite_frames("/path/to/dir/walk02.png", patterns=patterns)
+        self.assertEqual(len(frames), 3)
+        self.assertEqual(frames[0], "/path/to/dir/walk01.png")
+        self.assertEqual(frames[1], "/path/to/dir/walk02.png")
+        self.assertEqual(frames[2], "/path/to/dir/walk03.png")
+
+    @patch("os.listdir")
+    def test_find_sprite_frames_with_custom_patterns_no_match(self, mock_listdir):
+        mock_listdir.return_value = [
+            "walk01.png",
+            "walk02.png",
+        ]
+        patterns = [
+            "run{number}"
+        ]
+        frames = find_sprite_frames("/path/to/dir/walk01.png", separators=[], patterns=patterns)
+        self.assertEqual(frames, ["/path/to/dir/walk01.png"])
+
+    def test_template_to_regex_invalid(self):
+        from sprite_view.utils import template_to_regex
+        with self.assertRaises(ValueError):
+            template_to_regex("{prefix}_walk")
+
     def test_get_ansi_256_colors(self):
         colors = get_ansi_256_colors()
         self.assertEqual(len(colors), 256)

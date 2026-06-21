@@ -12,12 +12,58 @@ def format_size(bytes_size: int) -> str:
         bytes_size /= 1024
     return f"{bytes_size:.1f} TB"
 
-def find_sprite_frames(file_path: str, separators: List[str] = None) -> List[str]:
-    if not separators:
-        separators = ["_", "-"]
+def template_to_regex(template: str) -> str:
+    if "{number}" not in template:
+        raise ValueError("Pattern must contain '{number}' placeholder")
+    
+    if "{prefix}" not in template:
+        template = "{prefix}" + template
+        
+    t = template.replace("{prefix}", "PREFIXPLACEHOLDER").replace("{number}", "NUMBERPLACEHOLDER")
+    escaped = re.escape(t)
+    regex_str = (
+        escaped
+        .replace("PREFIXPLACEHOLDER", "(?P<prefix>.*?)")
+        .replace("NUMBERPLACEHOLDER", "(?P<num>[0-9]{2,4})")
+    )
+    return rf"^{regex_str}\.(?P<ext>png|gif|bmp|jpg|jpeg|webp)$"
 
+def find_sprite_frames(file_path: str, separators: List[str] = None, patterns: List[str] = None) -> List[str]:
     dir_name = os.path.dirname(file_path)
     base_name = os.path.basename(file_path)
+
+    if patterns:
+        for pat_str in patterns:
+            try:
+                pat_regex_str = template_to_regex(pat_str)
+                pat = re.compile(pat_regex_str, re.IGNORECASE)
+                if "num" not in pat.groupindex:
+                    continue
+                match = pat.match(base_name)
+                if match:
+                    start, end = match.span("num")
+                    digit_len = end - start
+                    prefix_part = base_name[:start]
+                    suffix_part = base_name[end:]
+                    
+                    search_pat = re.compile(
+                        rf"^{re.escape(prefix_part)}([0-9]{{{digit_len}}}){re.escape(suffix_part)}$",
+                        re.IGNORECASE
+                    )
+                    
+                    frames = []
+                    for f in os.listdir(dir_name):
+                        if search_pat.match(f):
+                            frames.append(os.path.join(dir_name, f))
+                    
+                    frames.sort()
+                    if len(frames) > 1:
+                        return frames
+            except Exception as e:
+                print(f"Error matching pattern '{pat_str}': {e}")
+
+    if not separators:
+        separators = ["_", "-"]
 
     # Build alternation from separator list so users can configure extra separators
     sep_alts = "|".join(re.escape(s) for s in separators)
