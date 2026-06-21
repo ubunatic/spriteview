@@ -4,6 +4,9 @@ SHELL := bash
 EXTENSION_NAME := sprite_view.py
 INSTALL_SCRIPT := scripts/install.sh
 
+MP4_SOURCES := $(wildcard website/assets/*.mp4)
+WEBM_TARGETS := $(MP4_SOURCES:.mp4=.webm)
+
 _sleep := s(){ for t in $$(seq $$1); do sleep 1; echo -n "."; done; echo; }; s
 
 help: ⚙️  ## show this help
@@ -20,6 +23,11 @@ dev: ⚙️ test install
 	@echo -n "waiting for nautilus restart"
 	@$(_sleep) 3
 	$(MAKE) open
+
+webm: ⚙️ $(WEBM_TARGETS)  ## convert all mp4 screencasts to optimized webm (skips up-to-date files)
+
+%.webm: %.mp4
+	ffmpeg -y -i $< -c:v libvpx-vp9 -r 30 -crf 36 -b:v 0 -pix_fmt yuv420p -an $@
 
 browse: ⚙️ ##  open website in browser
 	open website/index.html
