@@ -47,7 +47,7 @@ $ make
 ## Project Structure
 
 *   [Makefile](file:///home/uwe/projects/nautilus/Makefile) — The self-documenting Makefile.
-*   [nautilus_preview.py](file:///home/uwe/projects/nautilus/nautilus_preview.py) — The Nautilus Python extension.
+*   [sprite_view.py](file:///home/uwe/projects/nautilus/sprite_view.py) — The Nautilus Python extension.
 *   [scripts/install.sh](file:///home/uwe/projects/nautilus/scripts/install.sh) — A POSIX/Bash conformant installation script.
 
 ## Code Standards Adhered To

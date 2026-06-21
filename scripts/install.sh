@@ -13,7 +13,7 @@ fail() {
    exit 1
 }
 
-extension_name="nautilus_preview.py"
+extension_name="sprite_view.py"
 user_ext_dir="${HOME}/.local/share/nautilus-python/extensions"
 
 if dpkg-query -W -f='${Status}' python3-nautilus 2>/dev/null | grep -q "ok installed"
@@ -44,7 +44,7 @@ then if cp "$extension_name" "$user_ext_dir/$extension_name"
      else fail "Could not copy $extension_name to $user_ext_dir"
      fi
 else printf 'Downloading %s from Codeberg...\n' "$extension_name" >&2
-     if curl -sSL -o "$user_ext_dir/$extension_name" "https://codeberg.org/nautilus-spriteview/raw/branch/main/nautilus_preview.py"
+     if curl -sSL -o "$user_ext_dir/$extension_name" "https://codeberg.org/nautilus-spriteview/raw/branch/main/sprite_view.py"
      then pass "Downloaded and installed $extension_name"
      else fail "Could not download $extension_name from Codeberg"
      fi
