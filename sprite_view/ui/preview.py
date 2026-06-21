@@ -58,6 +58,7 @@ class SelectableLabel(Gtk.Label):
         self.set_focusable(False)
 
 class ImagePreviewWindow(Gtk.Window):
+    _active_instances = []
     _shared_settings_win = None
     _shared_about_win = None
 
@@ -67,6 +68,9 @@ class ImagePreviewWindow(Gtk.Window):
 
         # Initialize style provider
         init_css()
+
+        self._dependent_windows = []
+        ImagePreviewWindow._active_instances.append(self)
 
         self.file_paths = file_paths
         self.first_frame_path = file_paths[0] if file_paths else ""
@@ -564,9 +568,29 @@ class ImagePreviewWindow(Gtk.Window):
         if self.timer_id is not None:
             GLib.source_remove(self.timer_id)
             self.timer_id = None
+
+        # 1. Destroy all registered dependent instance windows
+        for win in list(self._dependent_windows):
+            try:
+                win.destroy()
+            except Exception:
+                pass
+        self._dependent_windows.clear()
+
+        # Remove self from active instances
+        if self in ImagePreviewWindow._active_instances:
+            ImagePreviewWindow._active_instances.remove(self)
+
+        # 2. Transfer shared singleton windows to another active parent (if any)
+        other_parent = None
+        for inst in ImagePreviewWindow._active_instances:
+            if inst is not self:
+                other_parent = inst
+                break
+
         for win in (ImagePreviewWindow._shared_settings_win, ImagePreviewWindow._shared_about_win):
             if win is not None and win.get_transient_for() is self:
-                win.set_transient_for(None)
+                win.set_transient_for(other_parent)
 
     def _on_fps_changed(self, spin_button) -> None:
         fps = spin_button.get_value()
@@ -1028,10 +1052,25 @@ class ImagePreviewWindow(Gtk.Window):
         return False
 
 
-class ExportOptionsWindow(Gtk.Window):
-    def __init__(self, parent_win) -> None:
-        super().__init__(title="Advanced Export Options")
+class DependentWindow(Gtk.Window):
+    def __init__(self, parent_win, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.set_transient_for(parent_win)
+        
+        # Register with parent preview window
+        if hasattr(parent_win, "_dependent_windows"):
+            parent_win._dependent_windows.append(self)
+            
+        self.connect("destroy", self._on_dependent_destroy, parent_win)
+        
+    def _on_dependent_destroy(self, widget, parent_win) -> None:
+        if hasattr(parent_win, "_dependent_windows") and self in parent_win._dependent_windows:
+            parent_win._dependent_windows.remove(self)
+
+
+class ExportOptionsWindow(DependentWindow):
+    def __init__(self, parent_win) -> None:
+        super().__init__(parent_win, title="Advanced Export Options")
         self.set_default_size(360, 440)
         self.parent_win = parent_win
 
