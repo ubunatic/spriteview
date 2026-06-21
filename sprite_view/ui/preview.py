@@ -838,7 +838,7 @@ class ImagePreviewWindow(Gtk.Window):
             return canvas
         return img
 
-    def _export_image_to(self, default_name: str, ext: str, save_func) -> None:
+    def _export_image_to(self, default_name: str, ext: str, save_func, background: bool = False) -> None:
         dialog = Gtk.FileDialog.new()
         dialog.set_title(f"Export {ext.upper()}")
         dialog.set_initial_name(default_name)
@@ -865,19 +865,28 @@ class ImagePreviewWindow(Gtk.Window):
                         if not dest_path.lower().endswith(f".{ext}"):
                             dest_path += f".{ext}"
                         
-                        def bg_save():
+                        if background:
+                            # Run in background (BG job)
+                            def bg_save():
+                                try:
+                                    save_func(dest_path)
+                                    GLib.idle_add(self._show_export_success, dest_path)
+                                except Exception as ex:
+                                    GLib.idle_add(self._show_error_dialog, f"Failed to export: {str(ex)}")
+                            
+                            import threading
+                            threading.Thread(target=bg_save, daemon=True).start()
+                        else:
+                            # Run in foreground (FG job)
                             try:
                                 save_func(dest_path)
-                                GLib.idle_add(self._show_export_success, dest_path)
+                                self._show_export_success(dest_path)
                             except Exception as ex:
-                                GLib.idle_add(self._show_error_dialog, f"Failed to export: {str(ex)}")
-                        
-                        import threading
-                        threading.Thread(target=bg_save, daemon=True).start()
+                                self._show_error_dialog(f"Failed to export: {str(ex)}")
             except Exception as e:
                 err_str = str(e)
                 if "dismiss" not in err_str.lower() and "cancel" not in err_str.lower():
-                    GLib.idle_add(self._show_error_dialog, f"Failed to export: {err_str}")
+                    self._show_error_dialog(f"Failed to export: {err_str}")
                     
         dialog.save(self, None, on_saved, None)
 
@@ -1128,6 +1137,10 @@ class ExportOptionsWindow(Gtk.Window):
         self.ansi_chk = Gtk.CheckButton(label="Map to ANSI 256 Colors")
         self.ansi_chk.connect("toggled", self._on_ansi_toggled)
         box.append(self.ansi_chk)
+
+        self.bg_chk = Gtk.CheckButton(label="Export in Background")
+        self.bg_chk.set_active(False)
+        box.append(self.bg_chk)
         
         sep3 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         box.append(sep3)
@@ -1342,5 +1355,6 @@ class ExportOptionsWindow(Gtk.Window):
                         frame = frame.resize((new_w, new_h), resample)
                     frame.save(dest_path, format="ICO")
                     
+        run_in_bg = self.bg_chk.get_active()
         self.close()
-        self.parent_win._export_image_to(default_name, ext, process_and_save)
+        self.parent_win._export_image_to(default_name, ext, process_and_save, background=run_in_bg)
