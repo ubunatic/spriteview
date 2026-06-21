@@ -3,3 +3,6 @@ __pycache__/
 dist/
 .pytest_cache/
 .coverage
+
+# screencast source files (use webm via git lfs instead)
+*.mp4
