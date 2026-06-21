@@ -25,7 +25,7 @@ except ImportError:
 from gi.repository import GObject, Notify, Gtk
 
 from sprite_view.utils import find_sprite_frames
-from sprite_view.ui.preview import ImagePreviewWindow
+from sprite_view.ui.preview import ImagePreviewWindow, ExportOptionsWindow, WindowManager
 from sprite_view.settings import load_settings
 from sprite_view.ui.about import AboutWindow
 from sprite_view.ui.settings import SettingsWindow
@@ -313,11 +313,11 @@ def main() -> None:
     parser.add_argument("files", nargs="*", help="Sprite image file(s) or sheet image file")
     parser.add_argument("--settings", action="store_true", help="Open the settings window")
     parser.add_argument("--about", action="store_true", help="Open the about dialog")
-    parser.add_argument("--export", help="Export format (png, gif, webm, ico) without opening GUI")
+    parser.add_argument("--export", nargs="?", const="choose", help="Export format (png, gif, webm, ico) without opening GUI, or omit format to open advanced dialog")
 
     args = parser.parse_args()
 
-    if args.export:
+    if args.export and args.export.lower() != "choose":
         export_cli(args.files, args.export)
         return
 
@@ -370,6 +370,9 @@ def main() -> None:
             win = ImagePreviewWindow(frames, selected_file_path, title)
             app_inst.add_window(win)
             win.present()
+
+            if args.export and args.export.lower() == "choose":
+                WindowManager.get_dependent(win, ExportOptionsWindow)
 
     app.connect("activate", on_activate)
     app.run([sys.argv[0]])

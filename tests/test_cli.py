@@ -130,5 +130,44 @@ class TestCLI(unittest.TestCase):
         self.assertIn("10.0", cmd)
         self.assertIn("/mock/cwd/walk.webm", cmd)
 
+    @patch("sprite_view_entry.find_sprite_frames")
+    @patch("sprite_view_entry.load_settings")
+    @patch("sprite_view_entry.ImagePreviewWindow")
+    @patch("sprite_view_entry.ExportOptionsWindow")
+    @patch("sprite_view_entry.WindowManager")
+    @patch("gi.repository.Gtk.Application")
+    @patch("os.path.exists")
+    def test_export_cli_choose_dialog(self, mock_exists, mock_gtk_app, mock_wm, mock_export_win, mock_preview_win, mock_load, mock_find):
+        mock_exists.return_value = True
+        mock_load.return_value = {"default_fps": 15.0}
+        mock_find.return_value = ["/path/to/sprite.png"]
+
+        # Call main() to simulate CLI execution with `--export` (which gets parsed as "choose")
+        with patch("sys.argv", ["spriteview", "/path/to/sprite.png", "--export"]):
+            main()
+
+        # Verify Gtk.Application was created and run
+        mock_gtk_app.assert_called_once()
+        app_instance = mock_gtk_app.return_value
+        app_instance.run.assert_called_once()
+
+        # Simulate Gtk Application activate callback
+        connect_calls = app_instance.connect.call_args_list
+        activate_func = None
+        for call in connect_calls:
+            if call[0][0] == "activate":
+                activate_func = call[0][1]
+                break
+
+        self.assertIsNotNone(activate_func)
+        
+        # Call activate function
+        activate_func(app_instance)
+
+        # Verify preview window was created and presented
+        mock_preview_win.assert_called_once()
+        # Verify ExportOptionsWindow was requested via WindowManager
+        mock_wm.get_dependent.assert_called_once_with(mock_preview_win.return_value, mock_export_win)
+
 if __name__ == "__main__":
     unittest.main()
