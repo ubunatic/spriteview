@@ -1108,6 +1108,9 @@
                 <button class="gallery-tab" data-target="tab-metadata">
                     <span>🎨</span> Color Palette & Settings
                 </button>
+                <button class="gallery-tab" data-target="tab-cli">
+                    <span>💻</span> Standalone CLI
+                </button>
             </div>
 
             <!-- Tab 1: Sprite Sequences -->
@@ -1222,6 +1225,55 @@
                         <div class="gallery-card-content">
                             <h3>Persistent Configuration</h3>
                             <p>Customize defaults via a standalone Settings dialog. Set default FPS, playback behavior, and define custom sequence separators and filename patterns.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Standalone CLI -->
+            <div class="gallery-pane" id="tab-cli">
+                <div class="gallery-grid grid-large">
+                    <!-- CLI card -->
+                    <div class="gallery-card">
+                        <div class="gallery-card-content" style="padding-top: 1.5rem;">
+                            <h3>Command Line Interface</h3>
+                            <p>SpriteView includes a fully standalone <code>spriteview</code> CLI tool, letting you view or export files directly from your terminal.</p>
+                            <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: var(--text-primary); font-size: 1rem;">Preview files or sequences:</h4>
+                            <div class="code-snippet" style="margin-bottom: 1rem;">
+                                <span id="gallery-cli-preview">spriteview my_sprite_01.png</span>
+                                <button onclick="copySnippet('gallery-cli-preview', this)" title="Copy text">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: var(--text-primary); font-size: 1rem;">Headless export:</h4>
+                            <div class="code-snippet">
+                                <span id="gallery-cli-export">spriteview walk_01.png --export gif</span>
+                                <button onclick="copySnippet('gallery-cli-export', this)" title="Copy text">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- CLI options card -->
+                    <div class="gallery-card">
+                        <div class="gallery-card-content" style="padding-top: 1.5rem;">
+                            <h3>Expected CLI Usage</h3>
+                            <ul style="list-style-type: none; padding-left: 0; display: flex; flex-direction: column; gap: 0.75rem; font-family: monospace; font-size: 0.85rem; color: var(--text-secondary);">
+                                <li>$ spriteview &lt;image&gt;</li>
+                                <li>$ spriteview &lt;sheet_image&gt;</li>
+                                <li>$ spriteview &lt;images..&gt;</li>
+                                <li>$ spriteview --settings</li>
+                                <li>$ spriteview --about</li>
+                                <li>$ spriteview &lt;image&gt; --export &lt;fmt&gt;</li>
+                                <li>$ spriteview &lt;sheet_image&gt; --export &lt;fmt&gt;</li>
+                            </ul>
+                            <p style="margin-top: 1.25rem; font-size: 0.85rem; font-family: sans-serif; color: var(--text-muted);">
+                                CLI exports default directly to the current working directory, retaining animation sequence configurations and upscaling behaviors.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -1379,6 +1431,38 @@
                     <div class="step-content">
                         <h3>Restart & Run</h3>
                         <p>Right-click any supported image (PNG, GIF, WebP, BMP, JPG) in Nautilus and choose "Preview Sprite Sheet" or "Preview Image" from the menu.</p>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="timeline-step">
+                    <span class="step-badge">4</span>
+                    <div class="step-content">
+                        <h3>Use Standalone CLI Mode</h3>
+                        <p>The installer also deploys a standalone <code>spriteview</code> CLI executable to <code>~/.local/bin/spriteview</code>. You can run it standalone to view or export sprites directly from your terminal:</p>
+                        <div class="code-snippet-wrapper" style="margin-bottom: 0.75rem;">
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Preview files or sequence animations</div>
+                            <div class="code-snippet">
+                                <span id="cli-run-preview">spriteview path/to/sprite_01.png</span>
+                                <button onclick="copySnippet('cli-run-preview', this)" title="Copy preview command">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="code-snippet-wrapper" style="margin-bottom: 0.75rem;">
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Headless exporting without opening GUI</div>
+                            <div class="code-snippet">
+                                <span id="cli-run-export">spriteview path/to/sprite_01.png --export gif</span>
+                                <button onclick="copySnippet('cli-run-export', this)" title="Copy export command">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <p style="font-size: 0.85rem; margin-top: 0.5rem; color: var(--text-muted);">See <code>spriteview --help</code> for details, including standalone configuration (<code>--settings</code>) and info (<code>--about</code>).</p>
                     </div>
                 </div>
             </div>
