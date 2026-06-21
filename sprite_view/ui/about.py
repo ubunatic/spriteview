@@ -38,6 +38,9 @@ class AboutWindow(Gtk.AboutDialog):
         
         prevent_label_selection(self)
 
+        # Close window when clicking the built-in Close button or response triggers
+        self.connect("response", lambda dialog, response_id: dialog.destroy())
+
         # Close window when ESC key is pressed
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)

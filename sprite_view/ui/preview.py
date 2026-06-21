@@ -73,7 +73,7 @@ class WindowManager:
         else:
             win = cls._singletons[name]
             win.set_transient_for(parent_win)
-            win.present()
+        win.present()
         return win
 
     @classmethod
@@ -93,11 +93,18 @@ class WindowManager:
         if parent_win in cls._active_parents:
             cls._active_parents.remove(parent_win)
             
-        # 3. Resolve transient re-parenting for singletons
+        # 3. Resolve transient re-parenting or destruction for singletons
         next_parent = cls._active_parents[0] if cls._active_parents else None
-        for name, win in cls._singletons.items():
-            if win is not None and win.get_transient_for() is parent_win:
-                win.set_transient_for(next_parent)
+        for name, win in list(cls._singletons.items()):
+            if win is not None:
+                if next_parent is None:
+                    # No active parent windows remain; destroy the singleton.
+                    try:
+                        win.destroy()
+                    except Exception:
+                        pass
+                elif win.get_transient_for() is parent_win:
+                    win.set_transient_for(next_parent)
 
     @classmethod
     def _on_dependent_destroyed(cls, parent_win: Gtk.Window, child_win: Gtk.Window) -> None:
