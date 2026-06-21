@@ -21,54 +21,9 @@ To solve this, windows are classified into two distinct lifecycle profiles:
 
 ---
 
-## 2. Current Implementation Pattern
+## 2. Centralized Window Registry System
 
-We currently handle this dynamically by maintaining an `_active_instances` registry list on the class level and using a `DependentWindow` helper wrapper:
-
-```python
-class DependentWindow(Gtk.Window):
-    def __init__(self, parent_win, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.set_transient_for(parent_win)
-        
-        # Register with parent preview window
-        if hasattr(parent_win, "_dependent_windows"):
-            parent_win._dependent_windows.append(self)
-            
-        self.connect("destroy", self._on_dependent_destroy, parent_win)
-        
-    def _on_dependent_destroy(self, widget, parent_win) -> None:
-        if hasattr(parent_win, "_dependent_windows") and self in parent_win._dependent_windows:
-            parent_win._dependent_windows.remove(self)
-```
-
-In the parent window `_on_destroy` handler:
-```python
-    def _on_destroy(self, widget) -> None:
-        # 1. Destroy instance-dependent windows
-        for win in list(self._dependent_windows):
-            try:
-                win.destroy()
-            except Exception:
-                pass
-        self._dependent_windows.clear()
-
-        # 2. Deregister self
-        if self in ImagePreviewWindow._active_instances:
-            ImagePreviewWindow._active_instances.remove(self)
-
-        # 3. Re-parent singletons to another active instance (if any)
-        other_parent = ImagePreviewWindow._active_instances[0] if ImagePreviewWindow._active_instances else None
-        for win in (ImagePreviewWindow._shared_settings_win, ImagePreviewWindow._shared_about_win):
-            if win is not None and win.get_transient_for() is self:
-                win.set_transient_for(other_parent)
-```
-
----
-
-## 3. Proposal: A Resilient Centralized Window Registry
-
-For larger codebases or to make window management highly resilient, we propose moving window management logic out of UI view components and into a dedicated **`WindowManager`** registry. 
+To keep view components decoupled and make window management highly resilient, we route all secondary windows (both dependent windows and shared singletons) through a dedicated **`WindowManager`** registry.
 
 ### Architecture Diagram
 
@@ -82,7 +37,7 @@ For larger codebases or to make window management highly resilient, we propose m
    Register Parent  Register Child   Manage Singletons
 ```
 
-### Proposed `WindowManager` Implementation
+### `WindowManager` Implementation
 
 ```python
 class WindowManager:
@@ -165,14 +120,17 @@ class WindowManager:
 
 ---
 
-## 4. Explicit Close-Request Handling
+## 3. Explicit Close-Request Handling
 
 To prevent transient child windows from entering invalid hidden/partially-destroyed states under different desktop environments and window managers:
 * All secondary windows (`AboutWindow`, `SettingsWindow`, `ExportOptionsWindow`) explicitly connect to the GTK `"close-request"` signal.
 * The handler calls `self.destroy()` directly to force complete object destruction and triggers the `WindowManager` tracking cleanup.
 * The handler returns `True` to inhibit standard window-manager-driven close flows that could clash with PyGObject's event loop.
 
-### Key Advantages of the Proposed Registry
+---
+
+## 4. Advantages of the Centralized Registry Architecture
+
 1. **Decoupled Logic**: Moves memory tracking, list sweeping, and event routing out of the view classes (`ImagePreviewWindow`, `ExportOptionsWindow`).
 2. **Automatic Safety Nets**: If a developer forgets to clean up a child window, the `WindowManager` automatically sweeps and destroys it when the parent terminates.
 3. **Thread and ID Safety**: Uses standard object IDs (`id(parent_win)`) to safely index tracking slots even if parent window references are cleared out of sequence.
