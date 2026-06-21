@@ -41,16 +41,18 @@ class TestSettings(unittest.TestCase):
         # Create a mock window instance
         win = MagicMock(spec=SettingsWindow)
         win.close = MagicMock()
+        win.destroy = MagicMock()
         
         # Test non-Escape key using the unbound method
         handled = SettingsWindow._on_key_pressed(win, None, Gdk.KEY_0, None, None)
         self.assertFalse(handled)
         win.close.assert_not_called()
+        win.destroy.assert_not_called()
         
         # Test Escape key using the unbound method
         handled = SettingsWindow._on_key_pressed(win, None, Gdk.KEY_Escape, None, None)
         self.assertTrue(handled)
-        win.close.assert_called_once()
+        win.destroy.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

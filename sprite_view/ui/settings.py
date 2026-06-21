@@ -108,7 +108,7 @@ class SettingsWindow(Gtk.Window):
 
     def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
         if keyval == Gdk.KEY_Escape:
-            self.close()
+            self.destroy()
             return True
         return False
 

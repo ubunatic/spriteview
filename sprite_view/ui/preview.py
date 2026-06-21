@@ -1221,7 +1221,7 @@ class ExportOptionsWindow(Gtk.Window):
         btn_row.set_halign(Gtk.Align.END)
         
         btn_cancel = Gtk.Button(label="Cancel")
-        btn_cancel.connect("clicked", lambda b: self.close())
+        btn_cancel.connect("clicked", lambda b: self.destroy())
         btn_row.append(btn_cancel)
         
         btn_export = Gtk.Button(label="Export...")
@@ -1237,7 +1237,7 @@ class ExportOptionsWindow(Gtk.Window):
 
     def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
         if keyval == Gdk.KEY_Escape:
-            self.close()
+            self.destroy()
             return True
         return False
 
