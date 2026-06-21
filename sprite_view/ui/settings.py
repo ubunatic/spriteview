@@ -5,7 +5,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 from gi.repository import Gtk, Gdk, GLib, Pango
-from sprite_view.settings import save_settings
+from sprite_view.settings import save_settings, load_settings
 
 class SettingsWindow(Gtk.Window):
     def __init__(self, parent_win) -> None:
@@ -13,7 +13,7 @@ class SettingsWindow(Gtk.Window):
         self.set_transient_for(parent_win)
         self.set_default_size(450, -1)
         self.parent_win = parent_win
-        self.settings = parent_win.settings
+        self.settings = parent_win.settings if parent_win else load_settings()
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_start(16)

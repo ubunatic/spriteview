@@ -40,19 +40,24 @@ test: ⚙️  ## run syntax check and unit tests
 pack: ⚙️  ## pack the app into a single self-contained file
 	python3 scripts/pack.py
 
-install: ⚙️ test pack  ## pack and install the extension, then restart Nautilus
+install: ⚙️ test pack  ## pack and install the extension and CLI, then restart Nautilus
 	@cp dist/$(EXTENSION_NAME) "$(HOME)/.local/share/nautilus-python/extensions/$(EXTENSION_NAME)"
+	@mkdir -p "$(HOME)/.local/bin"
+	@cp dist/$(EXTENSION_NAME) "$(HOME)/.local/bin/spriteview"
+	@chmod +x "$(HOME)/.local/bin/spriteview"
 	@echo "✅ Packed and installed single-file version of $(EXTENSION_NAME)"
+	@echo "✅ Installed spriteview CLI to $(HOME)/.local/bin/spriteview"
 	$(MAKE) restart
 
 script-install: ⚙️ test  ## install the extension and restart Nautilus
 	@chmod +x $(INSTALL_SCRIPT)
 	@./$(INSTALL_SCRIPT)
 
-uninstall: ⚙️  ## uninstall the extension and restart Nautilus
+uninstall: ⚙️  ## uninstall the extension and CLI, then restart Nautilus
 	@rm -f "$(HOME)/.local/share/nautilus-python/extensions/$(EXTENSION_NAME)"
 	@rm -rf "$(HOME)/.local/share/nautilus-python/extensions/sprite_view"
 	@rm -rf "$(HOME)/.local/share/nautilus-python/extensions/__pycache__"
+	@rm -f "$(HOME)/.local/bin/spriteview"
 	@nautilus -q || echo "failed to restart nautilus, see errors above"
 	@echo "✅ Uninstalled extension and restarted Nautilus"
 

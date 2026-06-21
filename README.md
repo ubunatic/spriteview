@@ -1,9 +1,9 @@
 # Nautilus Image Preview Plugin
 
-Modern GNOME Files (Nautilus) Python extension for Ubuntu 26.04 LTS ("resolute").
+Modern GNOME Files (Nautilus) Python extension. Compatible with modern Linux distributions (GNOME 43+ / Nautilus 43+).
 
-![Nautilus SpriteView Menu](website/assets/spriteview-menu.png)
-![Nautilus SpriteView Player](website/assets/spriteview-player.png)
+![Nautilus SpriteView Animation Player](website/assets/spriteview-screen-sheet-001.png)
+![Nautilus SpriteView Color Analyzer](website/assets/spriteview-screen-color-info.png)
 
 This plugin adds a `"Preview Image"` (or `"Preview Sprite Sheet"`) action to the right-click context menu of image files (`.png`, `.gif`, `.bmp`, `.jpg`, `.jpeg`, `.webp`). When activated, it opens a custom split-pane GTK4 window to preview the image:
 *   **Crisp Scaling**: Small pixel-art/PNG/GIF/BMP images undergo nearest-neighbor (point) integer upscaling beforehand. This ensures they are rendered with crisp, sharp pixels rather than a blurry filter when scaled to fit the window.
@@ -12,17 +12,24 @@ This plugin adds a `"Preview Image"` (or `"Preview Sprite Sheet"`) action to the
 *   **Color Palette**: Automatically extracts the top 16 most common colors in the active frame and displays them as colored swatches inside a wrapping layout grid. Swatch widgets are recycled dynamically to preserve hover tooltips even while animations play.
 *   **Interactive Color Info**: Clicking on any color swatch reveals a details panel in the sidebar showing its visual representation, closest ANSI 256 color index/name (determined by Euclidean distance), shorthand hex format (`#fff`), full hex (including alpha transparency if present), and RGBA formats.
 *   **Playback Controls**: For sprite sequences, it provides animation controls (Play, Pause, Step Next, Step Prev), a clickable visual frame thumbnail strip, a **dynamic FPS (Frames Per Second) speed control** (using a `Gtk.SpinButton` from `1` to `60` FPS), and **multiple playback modes** (Loop, Ping-Pong, and Once via a modern GTK4 `Gtk.DropDown` selector).
-*   **Persistent Settings**: Access a standalone Settings window via the title bar hamburger menu to configure your default FPS, toggle "Remember FPS" (by sheet or by directory scope), and define the default playback mode.
+*   **Persistent Settings**: Access a standalone Settings window via the title bar hamburger menu to configure your default FPS, toggle "Remember FPS" (by sheet or by directory scope), select default playback mode, and customize sequence separators/filename matching patterns.
 *   **Native About Page**: Includes a custom About page featuring an embedded, pixel-perfect rendering of the first sprite frame as the program logo.
 
 ## Installation
 
 ### 1. Prerequisites
 
-Ensure you have the Python 3 bindings for Nautilus components installed:
+Ensure you have the Python 3 bindings for Nautilus components installed on your distribution:
 
 ```bash
+# Ubuntu / Debian / Linux Mint
 sudo apt install python3-nautilus
+
+# Fedora / RHEL
+sudo dnf install nautilus-python
+
+# Arch Linux / Manjaro
+sudo pacman -S nautilus-python
 ```
 
 ### 2. Install the Plugin
