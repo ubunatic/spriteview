@@ -862,7 +862,7 @@ class ImagePreviewWindow(Gtk.Window):
             return canvas
         return img
 
-    def _export_image_to(self, default_name: str, ext: str, save_func, background: bool = False) -> None:
+    def _export_image_to(self, default_name: str, ext: str, save_func, background: bool = False, on_choose = None) -> None:
         dialog = Gtk.FileDialog.new()
         dialog.set_title(f"Export {ext.upper()}")
         dialog.set_initial_name(default_name)
@@ -889,6 +889,9 @@ class ImagePreviewWindow(Gtk.Window):
                         if not dest_path.lower().endswith(f".{ext}"):
                             dest_path += f".{ext}"
                         
+                        if on_choose:
+                            on_choose()
+                            
                         if background:
                             # Run in background (BG job)
                             def bg_save():
@@ -1395,5 +1398,4 @@ class ExportOptionsWindow(DependentWindow):
                     frame.save(dest_path, format="ICO")
                     
         run_in_bg = self.bg_chk.get_active()
-        self.close()
-        self.parent_win._export_image_to(default_name, ext, process_and_save, background=run_in_bg)
+        self.parent_win._export_image_to(default_name, ext, process_and_save, background=run_in_bg, on_choose=self.close)
