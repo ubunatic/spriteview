@@ -189,6 +189,7 @@ class ImagePreviewWindow(Gtk.Window):
             v_lbl = Gtk.Label(label="-")
             v_lbl.set_halign(Gtk.Align.START)
             v_lbl.set_selectable(True)
+            v_lbl.set_focusable(False)
             row.append(t_lbl)
             row.append(v_lbl)
             info_box.append(row)
@@ -296,6 +297,7 @@ class ImagePreviewWindow(Gtk.Window):
             v_lbl = Gtk.Label(label="-")
             v_lbl.set_halign(Gtk.Align.START)
             v_lbl.set_selectable(True)
+            v_lbl.set_focusable(False)
             row.append(t_lbl)
             row.append(v_lbl)
             labels_vbox.append(row)
@@ -629,14 +631,4 @@ class ImagePreviewWindow(Gtk.Window):
             self.set_focus(self.btn_play_pause)
         else:
             self.set_focus(None)
-
-        # Ensure no selectable labels have an active or inactive text selection on startup
-        def clear_selections(widget):
-            if isinstance(widget, Gtk.Label) and widget.get_selectable():
-                widget.select_region(0, 0)
-            child = widget.get_first_child()
-            while child:
-                clear_selections(child)
-                child = child.get_next_sibling()
-        clear_selections(self)
         return False
