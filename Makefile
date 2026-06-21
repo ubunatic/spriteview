@@ -43,6 +43,7 @@ pack: ⚙️  ## pack the app into a single self-contained file
 install: ⚙️ test pack  ## pack and install the extension, then restart Nautilus
 	@cp dist/$(EXTENSION_NAME) "$(HOME)/.local/share/nautilus-python/extensions/$(EXTENSION_NAME)"
 	@echo "✅ Packed and installed single-file version of $(EXTENSION_NAME)"
+	$(MAKE) restart
 
 script-install: ⚙️ test  ## install the extension and restart Nautilus
 	@chmod +x $(INSTALL_SCRIPT)
