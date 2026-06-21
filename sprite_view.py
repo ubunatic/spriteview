@@ -298,6 +298,30 @@ class SettingsWindow(Gtk.Window):
         save_settings(self.settings)
 
 
+EMBEDDED_LOGO_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAATBJREFUS"
+    "IntlDFqwzAYhT/XXpvEJCAMgUKHjF26d8qQpVv2jjmAz9EDpGfI1iVDL5AbFA+FQsEYYlyaK"
+    "YNxh1ZGliUnwYZSyLdYEvZ7kv+nHxSuLm8KWqJrXLQVPMT/N3AArsV9kc4mnQoP1xFvybPgA"
+    "aSzCcN1RO4HnYi7WfyjlYAnF3M/gLvbTgzSfcRgswMMNZgvR8yXo9pYhAIRinIM0JuOy+960"
+    "3FlLjEWebXYGneWPCaVp25iomawWmzLXduQJwD4evkwjq0GurjtNBL9N+k4AP2HsBhsdp0V+"
+    "fO3yO+vT87f3WQ1SUAlQbYUnWSgoybnFI42UJOjx7QpqlYDGVdTiqTZoYiC0ipsJhLTJWsSr"
+    "hm4WUy6jxpfPha1cXrqgmxQbcn9ADeLO9E6055vfaxsHuTYIiAAAAAASUVORK5CYII="
+)
+
+def get_embedded_logo() -> Gdk.Texture:
+    import base64
+    try:
+        img_data = base64.b64decode(EMBEDDED_LOGO_B64)
+        loader = GdkPixbuf.PixbufLoader.new_with_type("png")
+        loader.write(img_data)
+        loader.close()
+        pixbuf = loader.get_pixbuf()
+        return Gdk.Texture.new_for_pixbuf(pixbuf)
+    except Exception as e:
+        print(f"Error loading embedded logo: {e}")
+        return None
+
+
 class AboutWindow(Gtk.AboutDialog):
     def __init__(self, parent_win) -> None:
         super().__init__()
@@ -310,9 +334,10 @@ class AboutWindow(Gtk.AboutDialog):
         self.set_copyright("© 2026 Uwe Jugel")
         self.set_license_type(Gtk.License.AGPL_3_0_ONLY)
         
-        # Set the logo to show sprite 1 (the first frame)
-        if hasattr(parent_win, "textures") and parent_win.textures:
-            self.set_logo(parent_win.textures[0])
+        # Set the logo to show embedded sprite 1
+        logo_texture = get_embedded_logo()
+        if logo_texture:
+            self.set_logo(logo_texture)
 
 
 class ImagePreviewWindow(Gtk.Window):
