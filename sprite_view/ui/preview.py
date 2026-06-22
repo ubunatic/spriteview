@@ -75,8 +75,9 @@ class SelectableLabel(Gtk.Label):
 
 class ImagePreviewWindow(Gtk.ApplicationWindow):
 
-    def __init__(self, app: Gtk.Application, file_paths: List[str], selected_file_path: str, title: str) -> None:
+    def __init__(self, app: Gtk.Application, file_paths: List[str], selected_file_path: str, title: str, initial_open_folder: str = None) -> None:
         super().__init__(application=app, title=title)
+        self.initial_open_folder = initial_open_folder
         self.set_default_size(780, 580)
         self.set_icon_name("com.ubunatic.spriteview")
         # Build local runtime icon fallback cache
@@ -698,6 +699,14 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         dialog = Gtk.FileDialog.new()
         dialog.set_title("Open Images")
         
+        if self.file_paths:
+            parent_dir = os.path.dirname(self.file_paths[0])
+            gio_folder = Gio.File.new_for_path(parent_dir)
+            dialog.set_initial_folder(gio_folder)
+        elif hasattr(self, 'initial_open_folder') and self.initial_open_folder:
+            gio_folder = Gio.File.new_for_path(self.initial_open_folder)
+            dialog.set_initial_folder(gio_folder)
+        
         # Build filter
         store = Gio.ListStore.new(Gtk.FileFilter)
         f = Gtk.FileFilter()
@@ -1067,6 +1076,14 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         super().present()
         # Schedule setting/clearing focus on presentation to ensure proper startup focus state
         GLib.idle_add(self._set_initial_focus)
+        if hasattr(self, 'initial_open_folder') and self.initial_open_folder:
+            GLib.idle_add(self._auto_open_file_dialog)
+
+    def _auto_open_file_dialog(self) -> bool:
+        if hasattr(self, 'initial_open_folder') and self.initial_open_folder:
+            self._on_open_clicked(None)
+            self.initial_open_folder = None
+        return False
 
     def _set_initial_focus(self) -> bool:
         if len(self.textures) > 1 and hasattr(self, "btn_play_pause") and self.btn_play_pause:

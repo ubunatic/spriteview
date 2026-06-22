@@ -325,18 +325,26 @@ def main() -> None:
                 frames = []
                 selected_file_path = ""
                 title = "Sprite View"
+                initial_open_folder = None
             elif len(args.files) == 1:
                 file_path = os.path.abspath(args.files[0])
                 if not os.path.exists(file_path):
                     print(f"Error: File not found: {file_path}", file=sys.stderr)
                     sys.exit(1)
 
-                settings = load_settings()
-                seps = settings.get("sequence_separators", ["_", "-"])
-                pats = settings.get("sequence_patterns", [])
-                frames = find_sprite_frames(file_path, separators=seps, patterns=pats)
-                selected_file_path = file_path
-                title = f"Preview: {os.path.basename(file_path)}"
+                if os.path.isdir(file_path):
+                    frames = []
+                    selected_file_path = ""
+                    title = "Sprite View"
+                    initial_open_folder = file_path
+                else:
+                    settings = load_settings()
+                    seps = settings.get("sequence_separators", ["_", "-"])
+                    pats = settings.get("sequence_patterns", [])
+                    frames = find_sprite_frames(file_path, separators=seps, patterns=pats)
+                    selected_file_path = file_path
+                    title = f"Preview: {os.path.basename(file_path)}"
+                    initial_open_folder = None
             else:
                 frames = []
                 for f in args.files:
@@ -349,8 +357,9 @@ def main() -> None:
                     sys.exit(1)
                 selected_file_path = frames[0]
                 title = f"Preview: {len(frames)} Selected Frames"
+                initial_open_folder = None
 
-            win = ImagePreviewWindow(app_inst, frames, selected_file_path, title)
+            win = ImagePreviewWindow(app_inst, frames, selected_file_path, title, initial_open_folder=initial_open_folder)
             win.present()
 
             if args.export and args.export.lower() == "choose":

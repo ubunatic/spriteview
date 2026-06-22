@@ -201,7 +201,40 @@ class TestCLI(unittest.TestCase):
         activate_func(app_instance)
 
         # Verify preview window was created with empty frames list
-        mock_preview_win.assert_called_once_with(app_instance, [], "", "Sprite View")
+        mock_preview_win.assert_called_once_with(app_instance, [], "", "Sprite View", initial_open_folder=None)
+
+    @patch("sprite_view_entry.load_settings")
+    @patch("sprite_view_entry.ImagePreviewWindow")
+    @patch("gi.repository.Gtk.Application")
+    @patch("os.path.exists")
+    @patch("os.path.isdir")
+    def test_main_with_directory(self, mock_isdir, mock_exists, mock_gtk_app, mock_preview_win, mock_load):
+        mock_exists.return_value = True
+        mock_isdir.return_value = True
+
+        # Test start with a directory path
+        with patch("sys.argv", ["spriteview", "/path/to/mock_dir"]):
+            main()
+
+        mock_gtk_app.assert_called_once()
+        app_instance = mock_gtk_app.return_value
+        app_instance.run.assert_called_once()
+
+        # Simulate Gtk Application activate callback
+        connect_calls = app_instance.connect.call_args_list
+        activate_func = None
+        for call in connect_calls:
+            if call[0][0] == "activate":
+                activate_func = call[0][1]
+                break
+
+        self.assertIsNotNone(activate_func)
+        activate_func(app_instance)
+
+        # Verify preview window was created with correct args and initial_open_folder set
+        mock_preview_win.assert_called_once_with(
+            app_instance, [], "", "Sprite View", initial_open_folder="/path/to/mock_dir"
+        )
 
 if __name__ == "__main__":
     unittest.main()
