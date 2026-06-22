@@ -155,3 +155,23 @@ Delay presenting the transient child window by a brief timeout (e.g. 100ms) to a
                 GLib.timeout_add(100, launch_export_dialog)
 ```
 During unit testing, mock/patch `GLib.timeout_add` to execute the callback synchronously to prevent test cases from finishing before the child window is registered.
+
+### Startup Dialog Presentation (e.g., File Dialogs)
+Similarly, when launching native or portal-based dialogs (such as `Gtk.FileDialog`) immediately at startup (e.g., when the application is opened target to a folder/directory and needs to prompt the user to open files at that location), the dialog should not be opened before the parent window is presented.
+
+Overriding `.present()` and scheduling the dialog presentation via `GLib.idle_add` ensures that the parent window is mapped and realized, providing a valid window handle (`self`) for the dialog to reference:
+
+```python
+    def present(self) -> None:
+        super().present()
+        # Schedule the dialog presentation on the next main loop idle tick
+        if hasattr(self, 'initial_open_folder') and self.initial_open_folder:
+            GLib.idle_add(self._auto_open_file_dialog)
+
+    def _auto_open_file_dialog(self) -> bool:
+        if hasattr(self, 'initial_open_folder') and self.initial_open_folder:
+            self._on_open_clicked(None)
+            self.initial_open_folder = None
+        return False
+```
+This keeps the presentation logic cleanly encapsulated within the window subclass and avoids arbitrary hardcoded delays.
