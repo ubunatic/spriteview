@@ -37,22 +37,36 @@ class TestSettings(unittest.TestCase):
         from sprite_view.ui.settings import SettingsWindow
         from unittest.mock import MagicMock
         from gi.repository import Gdk
-        
+
         # Create a mock window instance
         win = MagicMock(spec=SettingsWindow)
         win.close = MagicMock()
         win.destroy = MagicMock()
-        
+
         # Test non-Escape key using the unbound method
         handled = SettingsWindow._on_key_pressed(win, None, Gdk.KEY_0, None, None)
         self.assertFalse(handled)
         win.close.assert_not_called()
         win.destroy.assert_not_called()
-        
-        # Test Escape key using the unbound method
+
+        # ESC must call close() which routes through close-request -> idle destroy
         handled = SettingsWindow._on_key_pressed(win, None, Gdk.KEY_Escape, None, None)
         self.assertTrue(handled)
-        win.destroy.assert_called_once()
+        win.close.assert_called_once()
+
+    @patch("sprite_view.ui.settings.save_settings")
+    @patch("sprite_view.ui.settings.GLib")
+    def test_settings_window_close_request(self, mock_glib, mock_save):
+        from sprite_view.ui.settings import SettingsWindow
+        from unittest.mock import MagicMock
+
+        win = MagicMock(spec=SettingsWindow)
+        win.destroy = MagicMock()
+
+        # _on_close_request must schedule destroy via idle_add and return True
+        result = SettingsWindow._on_close_request(win, win)
+        self.assertTrue(result)
+        mock_glib.idle_add.assert_called_once_with(win.destroy)
 
 if __name__ == "__main__":
     unittest.main()

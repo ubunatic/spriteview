@@ -20,101 +20,20 @@ from sprite_view.settings import load_settings, save_settings
 from sprite_view.ui.about import AboutWindow
 from sprite_view.ui.settings import SettingsWindow
 
+def pixbuf_to_texture(pb: GdkPixbuf.Pixbuf) -> Gdk.Texture:
+    """Convert a GdkPixbuf to a Gdk.Texture without using the deprecated
+    Gdk.Texture.new_for_pixbuf (deprecated since GTK 4.20)."""
+    fmt = Gdk.MemoryFormat.R8G8B8A8 if pb.get_has_alpha() else Gdk.MemoryFormat.R8G8B8
+    builder = Gdk.MemoryTextureBuilder()
+    builder.set_bytes(GLib.Bytes.new(pb.get_pixels()))
+    builder.set_width(pb.get_width())
+    builder.set_height(pb.get_height())
+    builder.set_stride(pb.get_rowstride())
+    builder.set_format(fmt)
+    return builder.build()
+
+
 _ALIGN_LABELS = ["↖", "↑", "↗", "←", "·", "→", "↙", "↓", "↘"]
-
-
-class WindowManager:
-    """
-    Centralized registry managing window lifecycles, child dependencies,
-    and automatic transient parent resolution.
-    """
-    _active_parents = []
-    _dependent_map = {}  # parent_id -> list of dependent windows
-    _singletons = {}     # type_name -> window instance
-
-    @classmethod
-    def register_parent(cls, parent_win: Gtk.Window) -> None:
-        if parent_win not in cls._active_parents:
-            cls._active_parents.append(parent_win)
-            cls._dependent_map[id(parent_win)] = []
-            parent_win.connect("destroy", cls._on_parent_destroyed)
-
-    @classmethod
-    def register_dependent(cls, parent_win: Gtk.Window, child_win: Gtk.Window) -> None:
-        cls.register_parent(parent_win)  # Ensure parent is tracked
-        child_win.set_transient_for(parent_win)
-        cls._dependent_map[id(parent_win)].append(child_win)
-        child_win.connect("destroy", lambda w: cls._on_dependent_destroyed(parent_win, w))
-
-    @classmethod
-    def get_dependent(cls, parent_win: Gtk.Window, child_class) -> Gtk.Window:
-        parent_id = id(parent_win)
-        cls.register_parent(parent_win)  # Ensure parent is tracked
-        
-        for child in cls._dependent_map.get(parent_id, []):
-            if isinstance(child, child_class):
-                child.present()
-                return child
-                
-        win = child_class(parent_win)
-        cls._dependent_map[parent_id].append(win)
-        win.connect("destroy", lambda w: cls._on_dependent_destroyed(parent_win, w))
-        win.present()
-        return win
-
-    @classmethod
-    def get_singleton(cls, singleton_class, parent_win: Gtk.Window) -> Gtk.Window:
-        name = singleton_class.__name__
-        if name not in cls._singletons or cls._singletons[name] is None:
-            # Instantiate singleton
-            win = singleton_class(parent_win)
-            cls._singletons[name] = win
-            win.connect("destroy", lambda w: cls._on_singleton_destroyed(name))
-        else:
-            win = cls._singletons[name]
-            win.set_transient_for(parent_win)
-        win.present()
-        return win
-
-    @classmethod
-    def _on_parent_destroyed(cls, parent_win: Gtk.Window) -> None:
-        parent_id = id(parent_win)
-        
-        # 1. Sweep and destroy all dependent child windows
-        if parent_id in cls._dependent_map:
-            for child in list(cls._dependent_map[parent_id]):
-                try:
-                    child.destroy()
-                except Exception:
-                    pass
-            del cls._dependent_map[parent_id]
-            
-        # 2. Remove from active parents
-        if parent_win in cls._active_parents:
-            cls._active_parents.remove(parent_win)
-            
-        # 3. Resolve transient re-parenting or destruction for singletons
-        next_parent = cls._active_parents[0] if cls._active_parents else None
-        for name, win in list(cls._singletons.items()):
-            if win is not None:
-                if next_parent is None:
-                    # No active parent windows remain; destroy the singleton.
-                    try:
-                        win.destroy()
-                    except Exception:
-                        pass
-                elif win.get_transient_for() is parent_win:
-                    win.set_transient_for(next_parent)
-
-    @classmethod
-    def _on_dependent_destroyed(cls, parent_win: Gtk.Window, child_win: Gtk.Window) -> None:
-        parent_id = id(parent_win)
-        if parent_id in cls._dependent_map and child_win in cls._dependent_map[parent_id]:
-            cls._dependent_map[parent_id].remove(child_win)
-
-    @classmethod
-    def _on_singleton_destroyed(cls, name: str) -> None:
-        cls._singletons[name] = None
 
 def init_css():
     display = Gdk.Display.get_default()
@@ -154,17 +73,35 @@ class SelectableLabel(Gtk.Label):
         self.set_selectable(True)
         self.set_focusable(False)
 
-class ImagePreviewWindow(Gtk.Window):
+class ImagePreviewWindow(Gtk.ApplicationWindow):
 
-    def __init__(self, file_paths: List[str], selected_file_path: str, title: str) -> None:
-        super().__init__(title=title)
+    def __init__(self, app: Gtk.Application, file_paths: List[str], selected_file_path: str, title: str) -> None:
+        super().__init__(application=app, title=title)
         self.set_default_size(780, 580)
+        self.set_icon_name("com.ubunatic.spriteview")
+        # Build local runtime icon fallback cache
+        try:
+            import base64
+            from sprite_view.logo import EMBEDDED_BANNER_B64
+            cache_dir = os.path.join(GLib.get_user_cache_dir(), "spriteview")
+            os.makedirs(cache_dir, exist_ok=True)
+            icon_dir = os.path.join(cache_dir, "icons", "hicolor", "256x256", "apps")
+            os.makedirs(icon_dir, exist_ok=True)
+            icon_file = os.path.join(icon_dir, "com.ubunatic.spriteview.png")
+            if not os.path.exists(icon_file):
+                with open(icon_file, "wb") as f_icon:
+                    f_icon.write(base64.b64decode(EMBEDDED_BANNER_B64))
+            
+            # Add custom icon theme search path so GTK matches "com.ubunatic.spriteview" at runtime
+            display = Gdk.Display.get_default()
+            if display:
+                theme = Gtk.IconTheme.get_for_display(display)
+                theme.add_search_path(os.path.join(cache_dir, "icons"))
+        except Exception as e:
+            print(f"Error registering runtime icon theme search path: {e}")
 
         # Initialize style provider
         init_css()
-
-        # Register parent window with central WindowManager
-        WindowManager.register_parent(self)
 
         self.file_paths = file_paths
         self.first_frame_path = file_paths[0] if file_paths else ""
@@ -189,97 +126,63 @@ class ImagePreviewWindow(Gtk.Window):
         header_bar = Gtk.HeaderBar()
         self.set_titlebar(header_bar)
 
-        # Create hamburger menu button
+        # Create hamburger menu button backed by Gio.Menu + PopoverMenu so that
+        # items use the native 'menuitem' CSS node (correct weight and spacing).
         menu_button = Gtk.MenuButton()
         menu_button.set_icon_name("open-menu-symbolic")
 
-        # Create a simple popover containing "Settings..." and "About..." buttons
-        menu_popover = Gtk.Popover()
-        menu_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        menu_box.set_margin_start(6)
-        menu_box.set_margin_end(6)
-        menu_box.set_margin_top(6)
-        menu_box.set_margin_bottom(6)
+        # --- Gio.SimpleActions on this ApplicationWindow ---
+        def _add_action(name, callback):
+            action = Gio.SimpleAction.new(name, None)
+            action.connect("activate", callback)
+            self.add_action(action)
 
-        # Export Actions Group
+        _add_action("open",             self._on_open_clicked)
+        _add_action("export-png",       self._on_export_png_clicked)
+        _add_action("export-gif-frame", self._on_export_gif_frame_clicked)
+        _add_action("export-ico",       self._on_export_ico_clicked)
+        _add_action("export-gif-anim",  self._on_export_gif_anim_clicked)
+        _add_action("export-webm",      self._on_export_webm_clicked)
+        _add_action("export-adv",       self._on_export_adv_clicked)
+        _add_action("settings",         self._on_settings_clicked)
+        _add_action("about",            self._on_about_clicked)
+
+        # --- Gio.Menu (sections become separators automatically) ---
+        menu = Gio.Menu()
+
+        sec_open = Gio.Menu()
+        sec_open.append("Open...", "win.open")
+        menu.append_section(None, sec_open)
+
         if len(self.file_paths) > 1:
-            btn_export_png = Gtk.Button(label="Export Frame as PNG...")
-            btn_export_png.set_has_frame(False)
-            btn_export_png.set_halign(Gtk.Align.START)
-            btn_export_png.connect("clicked", self._on_export_png_clicked, menu_popover)
-            menu_box.append(btn_export_png)
+            sec_frame = Gio.Menu()
+            sec_frame.append("Export Frame as PNG...",  "win.export-png")
+            sec_frame.append("Export Frame as GIF...",  "win.export-gif-frame")
+            sec_frame.append("Export Frame as ICO...",  "win.export-ico")
+            menu.append_section(None, sec_frame)
 
-            btn_export_gif_frame = Gtk.Button(label="Export Frame as GIF...")
-            btn_export_gif_frame.set_has_frame(False)
-            btn_export_gif_frame.set_halign(Gtk.Align.START)
-            btn_export_gif_frame.connect("clicked", self._on_export_gif_frame_clicked, menu_popover)
-            menu_box.append(btn_export_gif_frame)
+            sec_anim = Gio.Menu()
+            sec_anim.append("Export Animation as GIF...",  "win.export-gif-anim")
+            sec_anim.append("Export Animation as WebM...", "win.export-webm")
+            menu.append_section(None, sec_anim)
+        elif len(self.file_paths) == 1:
+            sec_export = Gio.Menu()
+            sec_export.append("Export as PNG...", "win.export-png")
+            sec_export.append("Export as GIF...", "win.export-gif-frame")
+            sec_export.append("Export as ICO...", "win.export-ico")
+            menu.append_section(None, sec_export)
 
-            btn_export_ico = Gtk.Button(label="Export Frame as ICO...")
-            btn_export_ico.set_has_frame(False)
-            btn_export_ico.set_halign(Gtk.Align.START)
-            btn_export_ico.connect("clicked", self._on_export_ico_clicked, menu_popover)
-            menu_box.append(btn_export_ico)
+        sec_adv = Gio.Menu()
+        if self.file_paths:
+            sec_adv.append("Advanced Export...", "win.export-adv")
+            menu.append_section(None, sec_adv)
 
-            sep_anim = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-            menu_box.append(sep_anim)
+        sec_app = Gio.Menu()
+        sec_app.append("Settings...", "win.settings")
+        sec_app.append("About...",    "win.about")
+        menu.append_section(None, sec_app)
 
-            btn_export_gif_anim = Gtk.Button(label="Export Animation as GIF...")
-            btn_export_gif_anim.set_has_frame(False)
-            btn_export_gif_anim.set_halign(Gtk.Align.START)
-            btn_export_gif_anim.connect("clicked", self._on_export_gif_anim_clicked, menu_popover)
-            menu_box.append(btn_export_gif_anim)
-
-            btn_export_webm = Gtk.Button(label="Export Animation as WebM...")
-            btn_export_webm.set_has_frame(False)
-            btn_export_webm.set_halign(Gtk.Align.START)
-            btn_export_webm.connect("clicked", self._on_export_webm_clicked, menu_popover)
-            menu_box.append(btn_export_webm)
-        else:
-            btn_export_png = Gtk.Button(label="Export as PNG...")
-            btn_export_png.set_has_frame(False)
-            btn_export_png.set_halign(Gtk.Align.START)
-            btn_export_png.connect("clicked", self._on_export_png_clicked, menu_popover)
-            menu_box.append(btn_export_png)
-
-            btn_export_gif = Gtk.Button(label="Export as GIF...")
-            btn_export_gif.set_has_frame(False)
-            btn_export_gif.set_halign(Gtk.Align.START)
-            btn_export_gif.connect("clicked", self._on_export_gif_frame_clicked, menu_popover)
-            menu_box.append(btn_export_gif)
-
-            btn_export_ico = Gtk.Button(label="Export as ICO...")
-            btn_export_ico.set_has_frame(False)
-            btn_export_ico.set_halign(Gtk.Align.START)
-            btn_export_ico.connect("clicked", self._on_export_ico_clicked, menu_popover)
-            menu_box.append(btn_export_ico)
-
-        sep_adv = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        menu_box.append(sep_adv)
-
-        btn_export_adv = Gtk.Button(label="Advanced Export...")
-        btn_export_adv.set_has_frame(False)
-        btn_export_adv.set_halign(Gtk.Align.START)
-        btn_export_adv.connect("clicked", self._on_export_adv_clicked, menu_popover)
-        menu_box.append(btn_export_adv)
-
-        sep_menu = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        menu_box.append(sep_menu)
-
-        btn_settings = Gtk.Button(label="Settings...")
-        btn_settings.set_has_frame(False)
-        btn_settings.set_halign(Gtk.Align.START)
-        btn_settings.connect("clicked", self._on_settings_clicked, menu_popover)
-        menu_box.append(btn_settings)
-
-        btn_about = Gtk.Button(label="About...")
-        btn_about.set_has_frame(False)
-        btn_about.set_halign(Gtk.Align.START)
-        btn_about.connect("clicked", self._on_about_clicked, menu_popover)
-        menu_box.append(btn_about)
-
-        menu_popover.set_child(menu_box)
-        menu_button.set_popover(menu_popover)
+        menu_button.set_menu_model(menu)
         header_bar.pack_end(menu_button)
 
         self.textures: List[Gdk.Texture] = []
@@ -352,13 +255,10 @@ class ImagePreviewWindow(Gtk.Window):
         # Phase 2: pad (if mixed) + upscale + create textures
         self._build_textures(self.current_align)
 
-        if not self.textures:
-            label = Gtk.Label(label="Error: Could not load any images.")
-            left_box.append(label)
-            return
-
-        # Setup main picture (left pane)
-        self.picture = Gtk.Picture.new_for_paintable(self.textures[self.current_frame])
+        if self.textures:
+            self.picture = Gtk.Picture.new_for_paintable(self.textures[self.current_frame])
+        else:
+            self.picture = Gtk.Picture()
         self.picture.props.content_fit = Gtk.ContentFit.CONTAIN
         self.picture.set_vexpand(True)
         self.picture.set_hexpand(True)
@@ -656,6 +556,10 @@ class ImagePreviewWindow(Gtk.Window):
         if keyval == Gdk.KEY_Escape:
             self.close()
             return True
+        is_ctrl = (state & Gdk.ModifierType.CONTROL_MASK) != 0
+        if is_ctrl and keyval in (Gdk.KEY_w, Gdk.KEY_W, Gdk.KEY_q, Gdk.KEY_Q):
+            self.close()
+            return True
         return False
 
     def _on_destroy(self, widget) -> None:
@@ -678,13 +582,15 @@ class ImagePreviewWindow(Gtk.Window):
             self.settings.setdefault("saved_fps", {})[key] = fps
             save_settings(self.settings)
 
-    def _on_settings_clicked(self, button, popover) -> None:
-        popover.popdown()
-        WindowManager.get_singleton(SettingsWindow, self)
+    def _on_settings_clicked(self, action, param=None) -> None:
+        win = SettingsWindow(self)
+        win.set_modal(True)
+        win.present()
 
-    def _on_about_clicked(self, button, popover) -> None:
-        popover.popdown()
-        WindowManager.get_singleton(AboutWindow, self)
+    def _on_about_clicked(self, action, param=None) -> None:
+        win = AboutWindow(self)
+        win.set_modal(True)
+        win.present()
 
     def _on_mode_changed(self, dropdown, pspec) -> None:
         self.play_direction = 1
@@ -788,7 +694,65 @@ class ImagePreviewWindow(Gtk.Window):
         self.lbl_selected_long_hex.set_label(long_hex)
         self.lbl_selected_rgba.set_label(rgba_str)
 
+    def _on_open_clicked(self, action, param=None) -> None:
+        dialog = Gtk.FileDialog.new()
+        dialog.set_title("Open Images")
+        
+        # Build filter
+        store = Gio.ListStore.new(Gtk.FileFilter)
+        f = Gtk.FileFilter()
+        f.set_name("Image Files (*.png, *.gif, *.bmp, *.jpg, *.jpeg, *.webp)")
+        f.add_pattern("*.png")
+        f.add_pattern("*.gif")
+        f.add_pattern("*.bmp")
+        f.add_pattern("*.jpg")
+        f.add_pattern("*.jpeg")
+        f.add_pattern("*.webp")
+        store.append(f)
+        dialog.set_filters(store)
+
+        def on_open_finish(dialog_obj, result, user_data):
+            try:
+                gfiles = dialog_obj.open_multiple_finish(result)
+                if gfiles:
+                    paths = []
+                    for i in range(gfiles.get_n_items()):
+                        gfile = gfiles.get_item(i)
+                        path = gfile.get_path()
+                        if path:
+                            paths.append(path)
+                    if paths:
+                        # Relaunch standalone with selected files or restart window logic
+                        # Let's import find_sprite_frames to auto-expand sequences if a single file is selected
+                        from sprite_view.utils import find_sprite_frames
+                        if len(paths) == 1:
+                            seps = self.settings.get("sequence_separators", ["_", "-"])
+                            pats = self.settings.get("sequence_patterns", [])
+                            paths = find_sprite_frames(paths[0], separators=seps, patterns=pats)
+                        
+                        # Re-instantiate window components or reconstruct/update window state
+                        # To keep it extremely clean, we can just replace self.file_paths and recreate textures and UI child.
+                        # But relaunching is easiest and cleanest, or we can just reconstruct the self child.
+                        # Reconstructing the self child or resetting state is very fast:
+                        # Close the current window and spawn a new one with the same application!
+                        app_inst = self.get_application()
+                        if app_inst:
+                            from sprite_view.ui.preview import ImagePreviewWindow
+                            title = f"Preview: {os.path.basename(paths[0])}" if len(paths) == 1 else f"Preview: {len(paths)} Selected Frames"
+                            win = ImagePreviewWindow(app_inst, paths, paths[0], title)
+                            win.present()
+                            self.destroy()
+            except Exception as e:
+                err_str = str(e)
+                if "dismiss" not in err_str.lower() and "cancel" not in err_str.lower():
+                    self._show_error_dialog(f"Failed to open files: {err_str}")
+
+        dialog.open_multiple(self, None, on_open_finish, None)
+
     def _update_frame(self) -> None:
+        if not self.textures or self.current_frame >= len(self.textures):
+            return
+            
         self.picture.set_paintable(self.textures[self.current_frame])
         
         current_path = self.file_paths[self.current_frame]
@@ -867,7 +831,7 @@ class ImagePreviewWindow(Gtk.Window):
                 scale_factor = max(1, min(1024 // w, 1024 // h))
                 if scale_factor > 1:
                     pb = pb.scale_simple(w * scale_factor, h * scale_factor, GdkPixbuf.InterpType.NEAREST)
-            self.textures.append(Gdk.Texture.new_for_pixbuf(pb))
+            self.textures.append(pixbuf_to_texture(pb))
 
     def _on_align_btn_clicked(self, button: Gtk.Button, align: int) -> None:
         if align == self.current_align:
@@ -1007,39 +971,36 @@ class ImagePreviewWindow(Gtk.Window):
         alert.set_message(message)
         alert.show(self)
 
-    def _on_export_png_clicked(self, button, popover) -> None:
-        popover.popdown()
+    def _on_export_png_clicked(self, action, param=None) -> None:
         current_path = self.file_paths[self.current_frame]
         base = os.path.basename(current_path)
         name, _ = os.path.splitext(base)
         default_name = f"{name}.png"
-        
+
         def save_png(dest_path):
             img = self._get_pil_image(self.current_frame, pad_to_canvas=True)
             img.save(dest_path, "PNG")
-            
+
         self._export_image_to(default_name, "png", save_png)
 
-    def _on_export_gif_frame_clicked(self, button, popover) -> None:
-        popover.popdown()
+    def _on_export_gif_frame_clicked(self, action, param=None) -> None:
         current_path = self.file_paths[self.current_frame]
         base = os.path.basename(current_path)
         name, _ = os.path.splitext(base)
         default_name = f"{name}.gif"
-        
+
         def save_gif_frame(dest_path):
             img = self._get_pil_image(self.current_frame, pad_to_canvas=True)
             img.save(dest_path, "GIF")
-            
+
         self._export_image_to(default_name, "gif", save_gif_frame)
 
-    def _on_export_ico_clicked(self, button, popover) -> None:
-        popover.popdown()
+    def _on_export_ico_clicked(self, action, param=None) -> None:
         current_path = self.file_paths[self.current_frame]
         base = os.path.basename(current_path)
         name, _ = os.path.splitext(base)
         default_name = f"{name}.ico"
-        
+
         def save_ico(dest_path):
             img = self._get_pil_image(self.current_frame, pad_to_canvas=True)
             w, h = img.size
@@ -1048,18 +1009,17 @@ class ImagePreviewWindow(Gtk.Window):
                 new_w, new_h = int(w * ratio), int(h * ratio)
                 img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
             img.save(dest_path, format="ICO")
-            
+
         self._export_image_to(default_name, "ico", save_ico)
 
-    def _on_export_gif_anim_clicked(self, button, popover) -> None:
-        popover.popdown()
+    def _on_export_gif_anim_clicked(self, action, param=None) -> None:
         default_name = self._get_default_animation_name("gif")
-        
+
         def save_gif_anim(dest_path):
             images = [self._get_pil_image(i, pad_to_canvas=True) for i in range(len(self.file_paths))]
             fps = self.fps_spin.get_value()
             duration_ms = int(1000.0 / fps)
-            
+
             images[0].save(
                 dest_path,
                 "GIF",
@@ -1068,25 +1028,21 @@ class ImagePreviewWindow(Gtk.Window):
                 duration=duration_ms,
                 loop=0
             )
-            
+
         self._export_image_to(default_name, "gif", save_gif_anim)
 
-    def _on_export_webm_clicked(self, button, popover) -> None:
-        popover.popdown()
+    def _on_export_webm_clicked(self, action, param=None) -> None:
         default_name = self._get_default_animation_name("webm")
-        
+
         def save_webm(dest_path):
-            import tempfile
-            import subprocess
-            
             fps = self.fps_spin.get_value()
-            
+
             with tempfile.TemporaryDirectory() as tmpdir:
                 for i in range(len(self.file_paths)):
                     img = self._get_pil_image(i, pad_to_canvas=True)
                     frame_path = os.path.join(tmpdir, f"frame_{i:04d}.png")
                     img.save(frame_path, "PNG")
-                    
+
                 cmd = [
                     "ffmpeg", "-y",
                     "-framerate", str(fps),
@@ -1095,16 +1051,17 @@ class ImagePreviewWindow(Gtk.Window):
                     "-pix_fmt", "yuva420p",
                     dest_path
                 ]
-                
+
                 res = subprocess.run(cmd, capture_output=True)
                 if res.returncode != 0:
                     raise Exception(f"ffmpeg error: {res.stderr.decode()}")
-                    
+
         self._export_image_to(default_name, "webm", save_webm)
 
-    def _on_export_adv_clicked(self, button, popover) -> None:
-        popover.popdown()
-        WindowManager.get_dependent(self, ExportOptionsWindow)
+    def _on_export_adv_clicked(self, action, param=None) -> None:
+        win = ExportOptionsWindow(self)
+        win.set_modal(True)
+        win.present()
 
     def present(self) -> None:
         super().present()
@@ -1257,12 +1214,12 @@ class ExportOptionsWindow(Gtk.Window):
         self.add_controller(key_controller)
 
     def _on_close_request(self, window) -> bool:
-        self.destroy()
+        GLib.idle_add(self.destroy)
         return True
 
     def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
         if keyval == Gdk.KEY_Escape:
-            self.destroy()
+            self.close()  # emits close-request -> _on_close_request -> idle destroy
             return True
         return False
 

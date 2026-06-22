@@ -134,10 +134,9 @@ class TestCLI(unittest.TestCase):
     @patch("sprite_view_entry.load_settings")
     @patch("sprite_view_entry.ImagePreviewWindow")
     @patch("sprite_view_entry.ExportOptionsWindow")
-    @patch("sprite_view_entry.WindowManager")
     @patch("gi.repository.Gtk.Application")
     @patch("os.path.exists")
-    def test_export_cli_choose_dialog(self, mock_exists, mock_gtk_app, mock_wm, mock_export_win, mock_preview_win, mock_load, mock_find):
+    def test_export_cli_choose_dialog(self, mock_exists, mock_gtk_app, mock_export_win, mock_preview_win, mock_load, mock_find):
         mock_exists.return_value = True
         mock_load.return_value = {"default_fps": 15.0}
         mock_find.return_value = ["/path/to/sprite.png"]
@@ -160,7 +159,7 @@ class TestCLI(unittest.TestCase):
                 break
 
         self.assertIsNotNone(activate_func)
-        
+
         # Mock GLib.timeout_add to execute the callback immediately
         def mock_timeout_add(delay, callback, *args):
             callback(*args)
@@ -170,10 +169,39 @@ class TestCLI(unittest.TestCase):
             # Call activate function
             activate_func(app_instance)
 
-        # Verify preview window was created and presented
+        # Verify preview window was created with app instance and presented
         mock_preview_win.assert_called_once()
-        # Verify ExportOptionsWindow was requested via WindowManager
-        mock_wm.get_dependent.assert_called_once_with(mock_preview_win.return_value, mock_export_win)
+        call_args = mock_preview_win.call_args[0]
+        self.assertEqual(call_args[0], app_instance)  # first arg is the app
+        mock_preview_win.return_value.present.assert_called()
+        # Verify ExportOptionsWindow was constructed with the preview window as parent
+        mock_export_win.assert_called_once_with(mock_preview_win.return_value)
+
+    @patch("sprite_view_entry.load_settings")
+    @patch("sprite_view_entry.ImagePreviewWindow")
+    @patch("gi.repository.Gtk.Application")
+    def test_main_no_files(self, mock_gtk_app, mock_preview_win, mock_load):
+        # Test standalone start without files
+        with patch("sys.argv", ["spriteview"]):
+            main()
+
+        mock_gtk_app.assert_called_once()
+        app_instance = mock_gtk_app.return_value
+        app_instance.run.assert_called_once()
+
+        # Simulate Gtk Application activate callback
+        connect_calls = app_instance.connect.call_args_list
+        activate_func = None
+        for call in connect_calls:
+            if call[0][0] == "activate":
+                activate_func = call[0][1]
+                break
+
+        self.assertIsNotNone(activate_func)
+        activate_func(app_instance)
+
+        # Verify preview window was created with empty frames list
+        mock_preview_win.assert_called_once_with(app_instance, [], "", "Sprite View")
 
 if __name__ == "__main__":
     unittest.main()

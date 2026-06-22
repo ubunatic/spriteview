@@ -11,8 +11,9 @@ class AboutWindow(Gtk.AboutDialog):
     def __init__(self, parent_win) -> None:
         super().__init__()
         self.set_transient_for(parent_win)
+        self.set_modal(True)
 
-        self.set_program_name("Nautilus Sprite View")
+        self.set_program_name("Sprite View")
         self.set_version("1.0.0")
         self.set_comments("A lightweight sprite sheet and animation frame previewer for Nautilus.")
         self.set_website("https://github.com/ubunatic/nautilus")
@@ -47,12 +48,12 @@ class AboutWindow(Gtk.AboutDialog):
         self.add_controller(key_controller)
 
     def _on_close_request(self, window) -> bool:
-        self.destroy()
+        GLib.idle_add(self.destroy)
         return True
 
     def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
         if keyval == Gdk.KEY_Escape:
-            self.destroy()
+            self.close()  # emits close-request -> _on_close_request -> idle destroy
             return True
         return False
 

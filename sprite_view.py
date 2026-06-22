@@ -22,10 +22,10 @@ try:
 except ImportError:
     Nautilus = None
 
-from gi.repository import GObject, Notify, Gtk, GLib
+from gi.repository import GObject, Notify, Gtk, GLib, Gio
 
 from sprite_view.utils import find_sprite_frames
-from sprite_view.ui.preview import ImagePreviewWindow, ExportOptionsWindow, WindowManager
+from sprite_view.ui.preview import ImagePreviewWindow, ExportOptionsWindow
 from sprite_view.settings import load_settings
 from sprite_view.ui.about import AboutWindow
 from sprite_view.ui.settings import SettingsWindow
@@ -42,51 +42,27 @@ if Nautilus is not None:
             notification.show()
 
         def _on_preview_activated(self, menu: Nautilus.MenuItem, files: List[Nautilus.FileInfo]) -> None:
-            if len(files) == 1:
-                file = files[0]
-                name = file.get_name()
+            paths = []
+            for file in files:
                 location = file.get_location()
-                if not location:
-                    self._show_notification("Preview Error", f"Could not get location for {name}")
-                    return
+                if location:
+                    path = location.get_path()
+                    if path and os.path.exists(path):
+                        paths.append(path)
 
-                file_path = location.get_path()
-                if not file_path or not os.path.exists(file_path):
-                    self._show_notification("Preview Error", f"File path does not exist: {file_path}")
-                    return
-
-                # Find all sprite frames using configured separators and patterns
-                settings = load_settings()
-                seps = settings.get("sequence_separators", ["_", "-"])
-                pats = settings.get("sequence_patterns", [])
-                frames = find_sprite_frames(file_path, separators=seps, patterns=pats)
-                selected_file_path = file_path
-                title = f"Preview: {os.path.basename(file_path)}"
-            else:
-                frames = []
-                for file in files:
-                    location = file.get_location()
-                    if location:
-                        path = location.get_path()
-                        if path and os.path.exists(path):
-                            frames.append(path)
-
-                if not frames:
-                    self._show_notification("Preview Error", "No valid files found for preview")
-                    return
-
-                # Sort the frames alphabetically so they play in the correct chronological/numerical sequence
-                frames.sort()
-                selected_file_path = frames[0]
-                title = f"Preview: {len(frames)} Selected Frames"
+            if not paths:
+                self._show_notification("Preview Error", "No valid files found for preview")
+                return
 
             try:
-                win = ImagePreviewWindow(frames, selected_file_path, title)
-                self.preview_windows.append(win)
-                win.connect("destroy", lambda w: self.preview_windows.remove(w))
-                win.present()
+                import subprocess
+                import sys as _sys
+                # The packed file that Nautilus loaded is the standalone app too;
+                # launch it via the same interpreter that is running this extension.
+                subprocess.Popen([_sys.executable, os.path.abspath(__file__)] + paths)
             except Exception as e:
-                self._show_notification("Preview Error", f"Failed to open preview: {str(e)}")
+                self._show_notification("Preview Error", f"Failed to launch spriteview: {e}")
+
 
         def get_file_items(self, *args) -> List[Nautilus.MenuItem]:
             files = args[-1]
@@ -321,18 +297,21 @@ def main() -> None:
         export_cli(args.files, args.export)
         return
 
-    if not args.settings and not args.about and not args.files:
-        parser.print_help()
-        sys.exit(1)
-
     try:
         Notify.init("SpriteView")
     except Exception:
         pass
 
-    app = Gtk.Application(application_id="org.nautilus.SpriteView")
+    app = Gtk.Application(application_id="com.ubunatic.spriteview", flags=Gio.ApplicationFlags.FLAGS_NONE)
 
     def on_activate(app_inst):
+        # Set default icon name for all windows to match our desktop icon name.
+        Gtk.Window.set_default_icon_name("com.ubunatic.spriteview")
+
+        # The window/taskbar icon is provided by the .desktop file via the app-id.
+        # Set the human-readable application name for the title bar and task switcher.
+        GLib.set_application_name("Sprite View")
+
         if args.settings:
             win = SettingsWindow(None)
             app_inst.add_window(win)
@@ -342,7 +321,11 @@ def main() -> None:
             app_inst.add_window(win)
             win.present()
         else:
-            if len(args.files) == 1:
+            if not args.files:
+                frames = []
+                selected_file_path = ""
+                title = "Sprite View"
+            elif len(args.files) == 1:
                 file_path = os.path.abspath(args.files[0])
                 if not os.path.exists(file_path):
                     print(f"Error: File not found: {file_path}", file=sys.stderr)
@@ -367,13 +350,12 @@ def main() -> None:
                 selected_file_path = frames[0]
                 title = f"Preview: {len(frames)} Selected Frames"
 
-            win = ImagePreviewWindow(frames, selected_file_path, title)
-            app_inst.add_window(win)
+            win = ImagePreviewWindow(app_inst, frames, selected_file_path, title)
             win.present()
 
             if args.export and args.export.lower() == "choose":
                 def launch_export_dialog():
-                    WindowManager.get_dependent(win, ExportOptionsWindow)
+                    ExportOptionsWindow(win).present()
                     return False
                 GLib.timeout_add(100, launch_export_dialog)
 

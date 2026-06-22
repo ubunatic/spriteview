@@ -11,6 +11,7 @@ class SettingsWindow(Gtk.Window):
     def __init__(self, parent_win) -> None:
         super().__init__(title="Settings")
         self.set_transient_for(parent_win)
+        self.set_icon_name("com.ubunatic.spriteview")
         self.set_default_size(450, -1)
         self.parent_win = parent_win
         self.settings = parent_win.settings if parent_win else load_settings()
@@ -128,7 +129,10 @@ class SettingsWindow(Gtk.Window):
         pat_add_row.append(pat_add_btn)
         box.append(pat_add_row)
 
-        # Connect explicit close-request to direct destroy call
+        # Explicitly handle close-request so destroy() is always called, which
+        # triggers the WindowManager singleton tracking cleanup.  Scheduling via
+        # idle_add avoids calling destroy() synchronously inside the signal (GTK4
+        # re-entrancy issue that caused the first-close regression).
         self.connect("close-request", self._on_close_request)
 
         # Close window when ESC key is pressed
@@ -137,12 +141,12 @@ class SettingsWindow(Gtk.Window):
         self.add_controller(key_controller)
 
     def _on_close_request(self, window) -> bool:
-        self.destroy()
-        return True
+        GLib.idle_add(self.destroy)
+        return True  # suppress GTK's own close path; destroy() handles cleanup
 
     def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
         if keyval == Gdk.KEY_Escape:
-            self.destroy()
+            self.close()  # emits close-request → _on_close_request → destroy
             return True
         return False
 
