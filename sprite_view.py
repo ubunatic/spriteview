@@ -302,7 +302,7 @@ def main() -> None:
     except Exception:
         pass
 
-    app = Gtk.Application(application_id="com.ubunatic.spriteview", flags=Gio.ApplicationFlags.FLAGS_NONE)
+    app = Gtk.Application(application_id="com.ubunatic.spriteview", flags=Gio.ApplicationFlags.NON_UNIQUE)
 
     def on_activate(app_inst):
         # Set default icon name for all windows to match our desktop icon name.

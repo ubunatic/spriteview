@@ -104,33 +104,34 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         # Initialize style provider
         init_css()
 
-        self.file_paths = file_paths
-        self.first_frame_path = file_paths[0] if file_paths else ""
-        self.dir_path = os.path.dirname(self.first_frame_path) if self.first_frame_path else ""
-
         # Load settings
         self.settings = load_settings()
 
-        # Determine initial FPS for this sequence
+        # Determine initial FPS (defaults to 15.0)
         self.initial_fps = self.settings.get("default_fps", 15.0)
-        if self.settings.get("remember_fps", True) and self.first_frame_path:
-            saved_fps = self.settings.get("saved_fps", {})
-            scope = self.settings.get("remember_scope", "sheet")
-            key = f"sheet:{self.first_frame_path}" if scope == "sheet" else f"dir:{self.dir_path}"
-            if key in saved_fps:
-                try:
-                    self.initial_fps = float(saved_fps[key])
-                except (ValueError, TypeError):
-                    pass
 
         # Create custom HeaderBar for title bar
         header_bar = Gtk.HeaderBar()
         self.set_titlebar(header_bar)
 
+        # Folder navigation buttons
+        self.btn_folder_prev = Gtk.Button()
+        self.btn_folder_prev.set_icon_name("go-previous-symbolic")
+        self.btn_folder_prev.set_tooltip_text("Previous image in folder (Page Up)")
+        self.btn_folder_prev.connect("clicked", lambda b: self._load_sibling_image(-1))
+        header_bar.pack_start(self.btn_folder_prev)
+
+        self.btn_folder_next = Gtk.Button()
+        self.btn_folder_next.set_icon_name("go-next-symbolic")
+        self.btn_folder_next.set_tooltip_text("Next image in folder (Page Down)")
+        self.btn_folder_next.connect("clicked", lambda b: self._load_sibling_image(1))
+        header_bar.pack_start(self.btn_folder_next)
+
         # Create hamburger menu button backed by Gio.Menu + PopoverMenu so that
         # items use the native 'menuitem' CSS node (correct weight and spacing).
-        menu_button = Gtk.MenuButton()
-        menu_button.set_icon_name("open-menu-symbolic")
+        self.menu_button = Gtk.MenuButton()
+        self.menu_button.set_icon_name("open-menu-symbolic")
+        header_bar.pack_end(self.menu_button)
 
         # --- Gio.SimpleActions on this ApplicationWindow ---
         def _add_action(name, callback):
@@ -148,44 +149,9 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         _add_action("settings",         self._on_settings_clicked)
         _add_action("about",            self._on_about_clicked)
 
-        # --- Gio.Menu (sections become separators automatically) ---
-        menu = Gio.Menu()
-
-        sec_open = Gio.Menu()
-        sec_open.append("Open...", "win.open")
-        menu.append_section(None, sec_open)
-
-        if len(self.file_paths) > 1:
-            sec_frame = Gio.Menu()
-            sec_frame.append("Export Frame as PNG...",  "win.export-png")
-            sec_frame.append("Export Frame as GIF...",  "win.export-gif-frame")
-            sec_frame.append("Export Frame as ICO...",  "win.export-ico")
-            menu.append_section(None, sec_frame)
-
-            sec_anim = Gio.Menu()
-            sec_anim.append("Export Animation as GIF...",  "win.export-gif-anim")
-            sec_anim.append("Export Animation as WebM...", "win.export-webm")
-            menu.append_section(None, sec_anim)
-        elif len(self.file_paths) == 1:
-            sec_export = Gio.Menu()
-            sec_export.append("Export as PNG...", "win.export-png")
-            sec_export.append("Export as GIF...", "win.export-gif-frame")
-            sec_export.append("Export as ICO...", "win.export-ico")
-            menu.append_section(None, sec_export)
-
-        sec_adv = Gio.Menu()
-        if self.file_paths:
-            sec_adv.append("Advanced Export...", "win.export-adv")
-            menu.append_section(None, sec_adv)
-
-        sec_app = Gio.Menu()
-        sec_app.append("Settings...", "win.settings")
-        sec_app.append("About...",    "win.about")
-        menu.append_section(None, sec_app)
-
-        menu_button.set_menu_model(menu)
-        header_bar.pack_end(menu_button)
-
+        self.file_paths = []
+        self.first_frame_path = ""
+        self.dir_path = ""
         self.textures: List[Gdk.Texture] = []
         self.thumb_buttons: List[Gtk.Button] = []
         self.thumb_pics: List[Gtk.Picture] = []
@@ -196,13 +162,8 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.selected_color = (0, 0, 0, 255)
         self.current_align = 4  # center
         self.align_btns: List[Gtk.Button] = []
-        
-        try:
-            self.current_frame = file_paths.index(selected_file_path)
-        except ValueError:
-            self.current_frame = 0
-            
-        self.is_playing = len(file_paths) > 1
+        self.current_frame = 0
+        self.is_playing = False
         self.play_direction = 1
         self.timer_id = None
 
@@ -228,38 +189,8 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         right_box.set_size_request(240, -1)
         paned.set_end_child(right_box)
 
-        # Phase 1: decode originals and extract palettes
-        loaded_paths = []
-        for path in file_paths:
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
-                self.original_dimensions.append((pixbuf.get_width(), pixbuf.get_height()))
-                self.frame_palettes.append(self._extract_palette_from_pixbuf(pixbuf, 16))
-                self.original_pixbufs.append(pixbuf)
-                loaded_paths.append(path)
-            except Exception as e:
-                print(f"Error loading frame {path}: {e}")
-        self.file_paths = loaded_paths
-        self.first_frame_path = loaded_paths[0] if loaded_paths else ""
-        self.dir_path = os.path.dirname(self.first_frame_path) if self.first_frame_path else ""
-
-        # Detect mixed frame sizes and compute bounding-box canvas
-        if self.original_dimensions:
-            widths = [d[0] for d in self.original_dimensions]
-            heights = [d[1] for d in self.original_dimensions]
-            self.has_mixed_sizes = len(set(widths)) > 1 or len(set(heights)) > 1
-            self.canvas_size = (max(widths), max(heights))
-        else:
-            self.has_mixed_sizes = False
-            self.canvas_size = (0, 0)
-
-        # Phase 2: pad (if mixed) + upscale + create textures
-        self._build_textures(self.current_align)
-
-        if self.textures:
-            self.picture = Gtk.Picture.new_for_paintable(self.textures[self.current_frame])
-        else:
-            self.picture = Gtk.Picture()
+        # Build main picture widget
+        self.picture = Gtk.Picture()
         self.picture.props.content_fit = Gtk.ContentFit.CONTAIN
         self.picture.set_vexpand(True)
         self.picture.set_hexpand(True)
@@ -411,57 +342,51 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         key_controller.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_controller)
 
-        # If it's single image, skip animation controls setup but populate properties
-        if len(self.textures) == 1:
-            self._update_frame()
-            return
-
         # Setup indicator row (centered on its own row below picture)
         self.lbl_indicator = Gtk.Label(label="")
         self.lbl_indicator.set_halign(Gtk.Align.CENTER)
         left_box.append(self.lbl_indicator)
 
         # Setup Control Bar (centered on its own row below indicator)
-        control_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        control_box.set_halign(Gtk.Align.CENTER)
+        self.control_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.control_box.set_halign(Gtk.Align.CENTER)
         
         btn_prev = Gtk.Button(label="<")
         btn_prev.connect("clicked", self._on_prev_clicked)
-        control_box.append(btn_prev)
+        self.control_box.append(btn_prev)
         
         self.btn_play_pause = Gtk.Button(label="⏸ Pause")
         self.btn_play_pause.connect("clicked", self._on_play_pause_clicked)
-        control_box.append(self.btn_play_pause)
+        self.control_box.append(self.btn_play_pause)
         
         btn_next = Gtk.Button(label=">")
         btn_next.connect("clicked", self._on_next_clicked)
-        control_box.append(btn_next)
+        self.control_box.append(btn_next)
         
-        left_box.append(control_box)
+        left_box.append(self.control_box)
 
         # Setup Settings Box (centered below control buttons, combining FPS and Mode)
-        settings_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=15)
-        settings_box.set_halign(Gtk.Align.CENTER)
+        self.settings_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=15)
+        self.settings_box.set_halign(Gtk.Align.CENTER)
         
         fps_lbl = Gtk.Label(label="FPS:")
-        settings_box.append(fps_lbl)
+        self.settings_box.append(fps_lbl)
         
         adj = Gtk.Adjustment(value=self.initial_fps, lower=1.0, upper=60.0, step_increment=1.0, page_increment=5.0, page_size=0.0)
         self.fps_spin = Gtk.SpinButton(adjustment=adj, climb_rate=1.0, digits=0)
         self.fps_spin.connect("value-changed", self._on_fps_changed)
-        settings_box.append(self.fps_spin)
+        self.settings_box.append(self.fps_spin)
         
         mode_lbl = Gtk.Label(label="Mode:")
-        settings_box.append(mode_lbl)
+        self.settings_box.append(mode_lbl)
         
         self.mode_dropdown = Gtk.DropDown.new_from_strings(["Loop", "Ping-Pong", "Once"])
-        self.mode_dropdown.set_selected(self.settings.get("default_mode", 0))
         self.mode_dropdown.connect("notify::selected", self._on_mode_changed)
-        settings_box.append(self.mode_dropdown)
+        self.settings_box.append(self.mode_dropdown)
 
-        # 3×3 alignment grid — only visible for mixed-size sequences
-        align_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        align_box.append(Gtk.Label(label="Align:"))
+        # 3×3 alignment grid
+        self.align_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.align_box.append(Gtk.Label(label="Align:"))
         align_grid = Gtk.Grid()
         align_grid.set_row_spacing(1)
         align_grid.set_column_spacing(1)
@@ -472,46 +397,27 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             align_grid.attach(btn, i % 3, i // 3, 1, 1)
             self.align_btns.append(btn)
         self.align_btns[self.current_align].add_css_class("align-active")
-        align_box.append(align_grid)
-        align_box.set_visible(self.has_mixed_sizes)
-        settings_box.append(align_box)
+        self.align_box.append(align_grid)
+        self.settings_box.append(self.align_box)
 
-        left_box.append(settings_box)
+        left_box.append(self.settings_box)
 
         # Setup Sprite Sheet (ScrolledWindow containing horizontal Box)
-        scroll_win = Gtk.ScrolledWindow()
-        scroll_win.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
-        scroll_win.set_min_content_height(80)
-        scroll_win.set_hexpand(True)
+        self.scroll_win = Gtk.ScrolledWindow()
+        self.scroll_win.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
+        self.scroll_win.set_min_content_height(80)
+        self.scroll_win.set_hexpand(True)
         
-        thumbs_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        thumbs_box.set_halign(Gtk.Align.CENTER)
-        scroll_win.set_child(thumbs_box)
+        self.thumbs_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.thumbs_box.set_halign(Gtk.Align.CENTER)
+        self.scroll_win.set_child(self.thumbs_box)
         
-        left_box.append(scroll_win)
+        left_box.append(self.scroll_win)
 
-        # Create thumbnail buttons for the sprite sheet
-        for idx, texture in enumerate(self.textures):
-            btn_thumb = Gtk.Button()
-            btn_thumb.add_css_class("thumb-btn")
-            
-            thumb_pic = Gtk.Picture.new_for_paintable(texture)
-            thumb_pic.set_size_request(48, 48)
-            thumb_pic.props.content_fit = Gtk.ContentFit.CONTAIN
-            btn_thumb.set_child(thumb_pic)
-            
-            btn_thumb.connect("clicked", self._on_thumb_clicked, idx)
-            thumbs_box.append(btn_thumb)
-            self.thumb_buttons.append(btn_thumb)
-            self.thumb_pics.append(thumb_pic)
-
-        self._update_frame()
         self.connect("destroy", self._on_destroy)
-        
-        # Start timer matching the initial spin button value
-        initial_fps = self.fps_spin.get_value()
-        initial_interval = int(1000.0 / initial_fps)
-        self.timer_id = GLib.timeout_add(initial_interval, self._on_timer_tick)
+
+        # Load sequence data
+        self._load_sequence(file_paths, selected_file_path)
 
     def _extract_palette_from_pixbuf(self, pixbuf: GdkPixbuf.Pixbuf, max_colors: int = 16) -> List[tuple]:
         w = pixbuf.get_width()
@@ -561,7 +467,254 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         if is_ctrl and keyval in (Gdk.KEY_w, Gdk.KEY_W, Gdk.KEY_q, Gdk.KEY_Q):
             self.close()
             return True
+            
+        # Support Page Up / Page Down keys for folder navigation
+        if keyval == Gdk.KEY_Page_Up:
+            if hasattr(self, 'btn_folder_prev') and self.btn_folder_prev.get_sensitive():
+                self._load_sibling_image(-1)
+                return True
+        elif keyval == Gdk.KEY_Page_Down:
+            if hasattr(self, 'btn_folder_next') and self.btn_folder_next.get_sensitive():
+                self._load_sibling_image(1)
+                return True
+                
         return False
+
+    def _update_folder_navigation_sensitivity(self) -> None:
+        if not self.dir_path or not os.path.exists(self.dir_path):
+            self.btn_folder_prev.set_sensitive(False)
+            self.btn_folder_next.set_sensitive(False)
+            return
+            
+        try:
+            files = os.listdir(self.dir_path)
+        except Exception:
+            self.btn_folder_prev.set_sensitive(False)
+            self.btn_folder_next.set_sensitive(False)
+            return
+            
+        supported_exts = ('.png', '.gif', '.bmp', '.jpg', '.jpeg', '.webp')
+        img_count = sum(1 for f in files if f.lower().endswith(supported_exts) and os.path.isfile(os.path.join(self.dir_path, f)))
+        
+        has_siblings = img_count > len(self.file_paths) or (img_count > 1 and len(self.file_paths) == 1)
+        self.btn_folder_prev.set_sensitive(has_siblings)
+        self.btn_folder_next.set_sensitive(has_siblings)
+
+    def _load_sibling_image(self, step: int) -> None:
+        if not self.dir_path or not os.path.exists(self.dir_path):
+            return
+            
+        try:
+            files = sorted(os.listdir(self.dir_path))
+        except Exception as e:
+            print(f"Error listing directory: {e}")
+            return
+            
+        supported_exts = ('.png', '.gif', '.bmp', '.jpg', '.jpeg', '.webp')
+        folder_images = [
+            os.path.join(self.dir_path, f)
+            for f in files
+            if f.lower().endswith(supported_exts) and os.path.isfile(os.path.join(self.dir_path, f))
+        ]
+        
+        if not folder_images:
+            return
+            
+        ref_file = self.first_frame_path
+        if not ref_file:
+            return
+            
+        try:
+            curr_idx = folder_images.index(ref_file)
+        except ValueError:
+            # Fallback using basename
+            ref_base = os.path.basename(ref_file)
+            curr_idx = -1
+            for idx, img_path in enumerate(folder_images):
+                if os.path.basename(img_path) == ref_base:
+                    curr_idx = idx
+                    break
+            if curr_idx == -1:
+                curr_idx = 0
+                
+        n_images = len(folder_images)
+        next_idx = curr_idx
+        
+        for _ in range(n_images):
+            next_idx = (next_idx + step) % n_images
+            candidate = folder_images[next_idx]
+            if candidate not in self.file_paths or len(self.file_paths) <= 1:
+                break
+                
+        target_file = folder_images[next_idx]
+        
+        seps = self.settings.get("sequence_separators", ["_", "-"])
+        pats = self.settings.get("sequence_patterns", [])
+        from sprite_view.utils import find_sprite_frames
+        new_paths = find_sprite_frames(target_file, separators=seps, patterns=pats)
+        
+        if new_paths:
+            self._load_sequence(new_paths, target_file)
+
+    def _update_menu_model(self) -> None:
+        menu = Gio.Menu()
+
+        sec_open = Gio.Menu()
+        sec_open.append("Open...", "win.open")
+        menu.append_section(None, sec_open)
+
+        if len(self.file_paths) > 1:
+            sec_frame = Gio.Menu()
+            sec_frame.append("Export Frame as PNG...",  "win.export-png")
+            sec_frame.append("Export Frame as GIF...",  "win.export-gif-frame")
+            sec_frame.append("Export Frame as ICO...",  "win.export-ico")
+            menu.append_section(None, sec_frame)
+
+            sec_anim = Gio.Menu()
+            sec_anim.append("Export Animation as GIF...",  "win.export-gif-anim")
+            sec_anim.append("Export Animation as WebM...", "win.export-webm")
+            menu.append_section(None, sec_anim)
+        elif len(self.file_paths) == 1:
+            sec_export = Gio.Menu()
+            sec_export.append("Export as PNG...", "win.export-png")
+            sec_export.append("Export as GIF...", "win.export-gif-frame")
+            sec_export.append("Export as ICO...", "win.export-ico")
+            menu.append_section(None, sec_export)
+
+        sec_adv = Gio.Menu()
+        if self.file_paths:
+            sec_adv.append("Advanced Export...", "win.export-adv")
+            menu.append_section(None, sec_adv)
+
+        sec_app = Gio.Menu()
+        sec_app.append("Settings...", "win.settings")
+        sec_app.append("About...",    "win.about")
+        menu.append_section(None, sec_app)
+
+        self.menu_button.set_menu_model(menu)
+
+    def _load_sequence(self, file_paths: List[str], selected_file_path: str) -> None:
+        if self.timer_id is not None:
+            GLib.source_remove(self.timer_id)
+            self.timer_id = None
+
+        self.file_paths = []
+        self.first_frame_path = ""
+        self.dir_path = ""
+        self.textures = []
+        self.original_dimensions = []
+        self.original_pixbufs = []
+        self.frame_palettes = []
+        self.has_mixed_sizes = False
+        self.canvas_size = (0, 0)
+        self.current_frame = 0
+
+        # Phase 1: decode originals and extract palettes
+        loaded_paths = []
+        for path in file_paths:
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
+                self.original_dimensions.append((pixbuf.get_width(), pixbuf.get_height()))
+                self.frame_palettes.append(self._extract_palette_from_pixbuf(pixbuf, 16))
+                self.original_pixbufs.append(pixbuf)
+                loaded_paths.append(path)
+            except Exception as e:
+                print(f"Error loading frame {path}: {e}")
+        self.file_paths = loaded_paths
+        self.first_frame_path = loaded_paths[0] if loaded_paths else ""
+        self.dir_path = os.path.dirname(self.first_frame_path) if self.first_frame_path else ""
+
+        # Update title
+        title = f"Preview: {os.path.basename(self.file_paths[0])}" if len(self.file_paths) == 1 else f"Preview: {len(self.file_paths)} Selected Frames"
+        self.set_title(title)
+
+        # Update folder navigation buttons sensitivity
+        self._update_folder_navigation_sensitivity()
+
+        try:
+            self.current_frame = self.file_paths.index(selected_file_path)
+        except ValueError:
+            self.current_frame = 0
+
+        self.is_playing = len(self.file_paths) > 1
+        self.play_direction = 1
+
+        # Detect mixed frame sizes and compute bounding-box canvas
+        if self.original_dimensions:
+            widths = [d[0] for d in self.original_dimensions]
+            heights = [d[1] for d in self.original_dimensions]
+            self.has_mixed_sizes = len(set(widths)) > 1 or len(set(heights)) > 1
+            self.canvas_size = (max(widths), max(heights))
+
+        self._build_textures(self.current_align)
+
+        if self.textures:
+            self.picture.set_paintable(self.textures[self.current_frame])
+
+        # Clear and rebuild thumbs_box
+        child = self.thumbs_box.get_first_child()
+        while child is not None:
+            next_child = child.get_next_sibling()
+            self.thumbs_box.remove(child)
+            child = next_child
+
+        self.thumb_buttons = []
+        self.thumb_pics = []
+        for idx, texture in enumerate(self.textures):
+            btn_thumb = Gtk.Button()
+            btn_thumb.add_css_class("thumb-btn")
+            
+            thumb_pic = Gtk.Picture.new_for_paintable(texture)
+            thumb_pic.set_size_request(48, 48)
+            thumb_pic.props.content_fit = Gtk.ContentFit.CONTAIN
+            btn_thumb.set_child(thumb_pic)
+            
+            btn_thumb.connect("clicked", self._on_thumb_clicked, idx)
+            self.thumbs_box.append(btn_thumb)
+            self.thumb_buttons.append(btn_thumb)
+            self.thumb_pics.append(thumb_pic)
+
+        # Show/hide controls depending on sequence length
+        is_anim = len(self.file_paths) > 1
+        self.lbl_indicator.set_visible(is_anim)
+        self.control_box.set_visible(is_anim)
+        self.settings_box.set_visible(is_anim)
+        self.scroll_win.set_visible(is_anim)
+        self.align_box.set_visible(is_anim and self.has_mixed_sizes)
+
+        # Update align buttons css active state
+        for i, btn in enumerate(self.align_btns):
+            if i == self.current_align:
+                btn.add_css_class("align-active")
+            else:
+                btn.remove_css_class("align-active")
+
+        # Update FPS settings and timer
+        self.initial_fps = self.settings.get("default_fps", 15.0)
+        if self.settings.get("remember_fps", True) and self.first_frame_path:
+            saved_fps = self.settings.get("saved_fps", {})
+            scope = self.settings.get("remember_scope", "sheet")
+            key = f"sheet:{self.first_frame_path}" if scope == "sheet" else f"dir:{self.dir_path}"
+            if key in saved_fps:
+                try:
+                    self.initial_fps = float(saved_fps[key])
+                except (ValueError, TypeError):
+                    pass
+
+        self.fps_spin.set_value(self.initial_fps)
+        self.mode_dropdown.set_selected(self.settings.get("default_mode", 0))
+
+        # Re-set simple actions menu model
+        self._update_menu_model()
+
+        # Update UI frames
+        self._update_frame()
+        self._update_play_pause_button()
+
+        # Start timer if playing and not already started by value-changed signal
+        if is_anim and self.timer_id is None:
+            interval = int(1000.0 / self.initial_fps)
+            self.timer_id = GLib.timeout_add(interval, self._on_timer_tick)
 
     def _on_destroy(self, widget) -> None:
         if self.timer_id is not None:
@@ -739,18 +892,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
                             pats = self.settings.get("sequence_patterns", [])
                             paths = find_sprite_frames(paths[0], separators=seps, patterns=pats)
                         
-                        # Re-instantiate window components or reconstruct/update window state
-                        # To keep it extremely clean, we can just replace self.file_paths and recreate textures and UI child.
-                        # But relaunching is easiest and cleanest, or we can just reconstruct the self child.
-                        # Reconstructing the self child or resetting state is very fast:
-                        # Close the current window and spawn a new one with the same application!
-                        app_inst = self.get_application()
-                        if app_inst:
-                            from sprite_view.ui.preview import ImagePreviewWindow
-                            title = f"Preview: {os.path.basename(paths[0])}" if len(paths) == 1 else f"Preview: {len(paths)} Selected Frames"
-                            win = ImagePreviewWindow(app_inst, paths, paths[0], title)
-                            win.present()
-                            self.destroy()
+                        self._load_sequence(paths, paths[0])
             except Exception as e:
                 err_str = str(e)
                 if "dismiss" not in err_str.lower() and "cancel" not in err_str.lower():
