@@ -4,8 +4,8 @@
 
 Modern GNOME Files (Nautilus) Python extension. Compatible with modern Linux distributions (GNOME 43+ / Nautilus 43+).
 
-![Nautilus SpriteView Animation Player](website/assets/spriteview-screen-sheet-001.png)
-![Nautilus SpriteView Color Analyzer](website/assets/spriteview-screen-color-info.png)
+<img src="website/assets/spriteview-screen-sheet-001.png" alt="Nautilus SpriteView Animation Player" width="480">
+<img src="website/assets/spriteview-screen-color-info.png" alt="Nautilus SpriteView Color Analyzer" width="480">
 
 This plugin adds a `"Preview Image"` (or `"Preview Sprite Sheet"`) action to the right-click context menu of image files (`.png`, `.gif`, `.bmp`, `.jpg`, `.jpeg`, `.webp`). When activated, it opens a custom split-pane GTK4 window to preview the image:
 *   **Crisp Scaling**: Small pixel-art/PNG/GIF/BMP images undergo nearest-neighbor (point) integer upscaling beforehand. This ensures they are rendered with crisp, sharp pixels rather than a blurry filter when scaled to fit the window.
