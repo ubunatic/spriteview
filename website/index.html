@@ -1040,15 +1040,21 @@
             <div class="hero-badge">
                 🐧 Supports GNOME 43+ / Nautilus 43+
             </div>
-            <h1>Pixel-Perfect Image Previews<br>Directly in GNOME Files</h1>
-            <p class="subtitle">An elegant GTK4 extension for Nautilus that adds animation playback controls, nearest-neighbor scaling, color swatch palette extraction, and customizable layouts to your desktop workflow.</p>
-            
+            <h1>Pixel-Perfect Image Previews<br>for GNOME &amp; the Terminal</h1>
+            <p class="subtitle">A GTK4 image viewer with crisp nearest-neighbor scaling, sprite animation playback, color palette extraction, and smart multi-file sequencing — works standalone from the CLI and as a Nautilus right-click extension.</p>
+
             <div class="cta-group">
                 <a href="#install" class="btn btn-primary">
                     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                     </svg>
-                    Install Extension
+                    Install
+                </a>
+                <a href="#gallery" class="btn btn-secondary" onclick="document.querySelector('[data-target=tab-cli]').click()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Standalone CLI
                 </a>
                 <a href="https://codeberg.org/nautilus-spriteview" target="_blank" class="btn btn-secondary">
                     View Source Code
@@ -1237,7 +1243,7 @@
                     <div class="gallery-card">
                         <div class="gallery-card-content" style="padding-top: 1.5rem;">
                             <h3>Command Line Interface</h3>
-                            <p>SpriteView includes a fully standalone <code>spriteview</code> CLI tool, letting you view or export files directly from your terminal.</p>
+                            <p>Use <code>spriteview</code> as your default image viewer system-wide. It handles single images, multi-file sequences, and whole folders — with smart auto-detection, crisp scaling, and headless export — from the terminal or via desktop "Open With".</p>
                             <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: var(--text-primary); font-size: 1rem;">Preview files or sequences:</h4>
                             <div class="code-snippet" style="margin-bottom: 1rem;">
                                 <span id="gallery-cli-preview">spriteview my_sprite_01.png</span>
@@ -1247,7 +1253,7 @@
                                     </svg>
                                 </button>
                             </div>
-                            <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: var(--text-primary); font-size: 1rem;">Headless export:</h4>
+                            <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: var(--text-primary); font-size: 1rem;">Export (omit format to open GUI dialog):</h4>
                             <div class="code-snippet">
                                 <span id="gallery-cli-export">spriteview walk_01.png --export gif</span>
                                 <button onclick="copySnippet('gallery-cli-export', this)" title="Copy text">
@@ -1266,13 +1272,14 @@
                                 <li>$ spriteview &lt;image&gt;</li>
                                 <li>$ spriteview &lt;sheet_image&gt;</li>
                                 <li>$ spriteview &lt;images..&gt;</li>
+                                <li>$ spriteview &lt;folder&gt;</li>
                                 <li>$ spriteview --settings</li>
                                 <li>$ spriteview --about</li>
                                 <li>$ spriteview &lt;image&gt; --export &lt;fmt&gt;</li>
-                                <li>$ spriteview &lt;sheet_image&gt; --export &lt;fmt&gt;</li>
+                                <li>$ spriteview &lt;image&gt; --export</li>
                             </ul>
                             <p style="margin-top: 1.25rem; font-size: 0.85rem; font-family: sans-serif; color: var(--text-muted);">
-                                CLI exports default directly to the current working directory, retaining animation sequence configurations and upscaling behaviors.
+                                Pass a folder path to open the file picker directly in that directory. CLI exports write to the current working directory. Omit the format with <code>--export</code> to open the advanced GUI export dialog instead.
                             </p>
                         </div>
                     </div>
@@ -1352,6 +1359,16 @@
                     </div>
                     <h3>Persistent Settings</h3>
                     <p>Open standalone settings from the window menu to configure default FPS, define custom sequence separators, and manage filename pattern matching rules.</p>
+                </div>
+                <!-- F7 -->
+                <div class="feature-card">
+                    <div class="feature-icon-wrapper">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <h3>First-Class Standalone App</h3>
+                    <p>Use <code>spriteview</code> as your default PNG/GIF viewer system-wide. The installer registers a <code>.desktop</code> entry and MIME associations so it appears in "Open With" and file manager defaults — no Nautilus required.</p>
                 </div>
             </div>
         </div>
@@ -1441,7 +1458,7 @@
                         <h3>Use Standalone CLI Mode</h3>
                         <p>The installer also deploys a standalone <code>spriteview</code> CLI executable to <code>~/.local/bin/spriteview</code>. You can run it standalone to view or export sprites directly from your terminal:</p>
                         <div class="code-snippet-wrapper" style="margin-bottom: 0.75rem;">
-                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Preview files or sequence animations</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Preview files, sequences, or open a folder in the file picker</div>
                             <div class="code-snippet">
                                 <span id="cli-run-preview">spriteview path/to/sprite_01.png</span>
                                 <button onclick="copySnippet('cli-run-preview', this)" title="Copy preview command">
@@ -1452,7 +1469,7 @@
                             </div>
                         </div>
                         <div class="code-snippet-wrapper" style="margin-bottom: 0.75rem;">
-                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Headless exporting without opening GUI</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Headless export (omit format to open advanced GUI dialog)</div>
                             <div class="code-snippet">
                                 <span id="cli-run-export">spriteview path/to/sprite_01.png --export gif</span>
                                 <button onclick="copySnippet('cli-run-export', this)" title="Copy export command">

@@ -128,16 +128,32 @@ else printf 'Downloading %s from Codeberg...\n' "$extension_name" >&2
 fi
 
 # Copy Desktop Entry and Application Icon
+base_url="https://codeberg.org/nautilus-spriteview/raw/branch/main"
+desktop_file="${HOME}/.local/share/applications/com.ubunatic.spriteview.desktop"
 mkdir -p "${HOME}/.local/share/applications"
+install_desktop() {
+    sed "s|\.local/bin/|${HOME}/.local/bin/|g" "$1" > "$desktop_file"
+    pass "Installed desktop entry to ${HOME}/.local/share/applications"
+}
 if test -f "spriteview.desktop"
-then cp "spriteview.desktop" "${HOME}/.local/share/applications/com.ubunatic.spriteview.desktop"
-     pass "Installed desktop entry to ${HOME}/.local/share/applications"
+then install_desktop "spriteview.desktop"
+elif curl -sSL -o "/tmp/com.ubunatic.spriteview.desktop" "${base_url}/spriteview.desktop"
+then install_desktop "/tmp/com.ubunatic.spriteview.desktop"
+else printf 'Warning: could not install desktop entry\n' >&2
 fi
 
-if test -f "sprites/banner.png"
+icon_src="sprites/banner.png"
+if ! test -f "$icon_src"
+then icon_src="/tmp/com.ubunatic.spriteview.png"
+     if ! curl -sSL -o "$icon_src" "${base_url}/sprites/banner.png"
+     then printf 'Warning: could not download app icon\n' >&2
+          icon_src=""
+     fi
+fi
+if test -n "$icon_src"
 then for size in 128x128 256x256
      do mkdir -p "${HOME}/.local/share/icons/hicolor/${size}/apps"
-        cp "sprites/banner.png" "${HOME}/.local/share/icons/hicolor/${size}/apps/com.ubunatic.spriteview.png"
+        cp "$icon_src" "${HOME}/.local/share/icons/hicolor/${size}/apps/com.ubunatic.spriteview.png"
      done
      pass "Installed icon to ${HOME}/.local/share/icons/hicolor/..."
 fi

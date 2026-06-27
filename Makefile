@@ -48,7 +48,7 @@ install: ⚙️ test pack  ## pack and install the extension and CLI, then resta
 	@cp dist/$(EXTENSION_NAME) "$(HOME)/.local/bin/spriteview"
 	@chmod +x "$(HOME)/.local/bin/spriteview"
 	@mkdir -p "$(SHARE)/applications"
-	@cp spriteview.desktop "$(SHARE)/applications/com.ubunatic.spriteview.desktop"
+	@sed "s|\.local/bin/|$(HOME)/.local/bin/|g" spriteview.desktop > "$(SHARE)/applications/com.ubunatic.spriteview.desktop"
 	@mkdir -p "$(SHARE)/icons/hicolor/128x128/apps"
 	@cp sprites/banner-8x.png "$(SHARE)/icons/hicolor/128x128/apps/com.ubunatic.spriteview.png"
 	@mkdir -p "$(SHARE)/icons/hicolor/256x256/apps"
@@ -63,6 +63,17 @@ install: ⚙️ test pack  ## pack and install the extension and CLI, then resta
 
 check-install: ⚙️  ## check installed files
 	@find $(SHARE) -name '*com.ubunatic.spriteview*' 2>/dev/null || true
+
+test-desktop: ⚙️  ## validate and launch-test the installed .desktop entry
+	@desktop-file-validate "$(SHARE)/applications/com.ubunatic.spriteview.desktop" \
+	  && echo "✅ desktop-file-validate passed"
+	@grep -q "^Exec=$(HOME)" "$(SHARE)/applications/com.ubunatic.spriteview.desktop" \
+	  && echo "✅ Exec paths are absolute" \
+	  || (echo "❌ Exec paths are not absolute"; exit 1)
+	@gio launch "$(SHARE)/applications/com.ubunatic.spriteview.desktop" \
+	  sprites/sprite_0001.png & \
+	  pid=$$!; sleep 3; kill $$pid 2>/dev/null; \
+	  echo "✅ gio launch succeeded"
 
 script-install: ⚙️ test  ## install the extension and restart Nautilus
 	@chmod +x $(INSTALL_SCRIPT)
