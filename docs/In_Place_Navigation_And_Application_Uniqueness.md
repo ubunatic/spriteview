@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Sibling Navigation, In-Place Reloading, and Gtk Application Uniqueness
 
 This document details the architectural updates and session learnings regarding flicker-free folder navigation, PyGObject window reload lifecycle, and Gtk.Application uniqueness gotchas under DBus.

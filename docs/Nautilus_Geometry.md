@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Nautilus Window Geometry on Wayland
 
 Modern GNOME desktop environments running on Wayland utilize GTK4, which has removed support for the legacy `--geometry` command-line option. Additionally, Wayland's security model prevents traditional X11 automation tools like `xdotool` or `wmctrl` from querying or resizing native windows.

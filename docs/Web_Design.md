@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Web Design Guidelines & Layout Lessons
 
 This document records the evergreen styling patterns, CSS/HTML structural decisions, and layout learnings developed during the construction and debugging of the Nautilus SpriteView website.

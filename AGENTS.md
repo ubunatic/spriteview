@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- claudeconfig:begin Language Conventions -->
 Adhere to the following conventions.
 

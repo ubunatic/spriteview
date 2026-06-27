@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Nautilus Image Preview Plugin
 
 Modern GNOME Files (Nautilus) Python extension. Compatible with modern Linux distributions (GNOME 43+ / Nautilus 43+).

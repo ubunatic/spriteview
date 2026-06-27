@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1038,10 +1040,10 @@
     <header class="hero" id="overview">
         <div class="container">
             <div class="hero-badge">
-                🐧 Supports GNOME 43+ / Nautilus 43+
+                🎮 GTK4 Image Viewer for Linux
             </div>
-            <h1>Pixel-Perfect Image Previews<br>for GNOME &amp; the Terminal</h1>
-            <p class="subtitle">A GTK4 image viewer with crisp nearest-neighbor scaling, sprite animation playback, color palette extraction, and smart multi-file sequencing — works standalone from the CLI and as a Nautilus right-click extension.</p>
+            <h1>SpriteView — Crisp, Smart<br>Pixel Art &amp; Image Previews</h1>
+            <p class="subtitle">A lightweight GTK4 app for pixel artists and developers. Run <code>spriteview</code> from the terminal, set it as your default image viewer, or use it directly inside GNOME Files — with nearest-neighbor scaling, sprite animation playback, color palette extraction, and smart multi-file sequencing.</p>
 
             <div class="cta-group">
                 <a href="#install" class="btn btn-primary">
@@ -1054,7 +1056,7 @@
                     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
-                    Standalone CLI
+                    spriteview CLI
                 </a>
                 <a href="https://codeberg.org/nautilus-spriteview" target="_blank" class="btn btn-secondary">
                     View Source Code
@@ -1099,14 +1101,14 @@
     <section class="showcase-section" id="gallery">
         <div class="container">
             <div class="section-header">
-                <h2>Interactive Showcase</h2>
-                <p>Click on any of the screenshots below to inspect the interface layout, settings, and scaled previews in high resolution.</p>
+                <h2>See SpriteView in Action</h2>
+                <p>Click any screenshot to enlarge. Explore the <code>spriteview</code> CLI, crisp scaling, color tools, and the GNOME Files integration.</p>
             </div>
 
             <!-- Tab Menu -->
             <div class="gallery-tabs">
-                <button class="gallery-tab active" data-target="tab-sheets">
-                    <span>🕹️</span> Sprite Sequences
+                <button class="gallery-tab active" data-target="tab-cli">
+                    <span>💻</span> spriteview CLI
                 </button>
                 <button class="gallery-tab" data-target="tab-scaling">
                     <span>🔍</span> Crisp Scaling
@@ -1114,13 +1116,13 @@
                 <button class="gallery-tab" data-target="tab-metadata">
                     <span>🎨</span> Color Palette & Settings
                 </button>
-                <button class="gallery-tab" data-target="tab-cli">
-                    <span>💻</span> Standalone CLI
+                <button class="gallery-tab" data-target="tab-sheets">
+                    <span>🗂️</span> GNOME Files Integration
                 </button>
             </div>
 
-            <!-- Tab 1: Sprite Sequences -->
-            <div class="gallery-pane active" id="tab-sheets">
+            <!-- Tab: GNOME Files Integration -->
+            <div class="gallery-pane" id="tab-sheets">
                 <div class="gallery-grid">
                     <!-- Sheet 001 -->
                     <div class="gallery-card">
@@ -1129,8 +1131,8 @@
                             <span class="gallery-badge">Step 1: Open Folder</span>
                         </div>
                         <div class="gallery-card-content">
-                            <h3>Locate Sprite Sequences</h3>
-                            <p>Open GNOME Files (Nautilus) in the folder containing your individual animation frames.</p>
+                            <h3>Open in GNOME Files</h3>
+                            <p>Browse to your sprite folder in GNOME Files (Nautilus). SpriteView integrates directly into the right-click menu.</p>
                         </div>
                     </div>
                     <!-- Sheet 002 -->
@@ -1236,8 +1238,8 @@
                 </div>
             </div>
 
-            <!-- Tab 4: Standalone CLI -->
-            <div class="gallery-pane" id="tab-cli">
+            <!-- Tab: spriteview CLI -->
+            <div class="gallery-pane active" id="tab-cli">
                 <div class="gallery-grid grid-large">
                     <!-- CLI card -->
                     <div class="gallery-card">
@@ -1293,8 +1295,8 @@
     <section class="features" id="features">
         <div class="container">
             <div class="section-header">
-                <h2>Key Capabilities</h2>
-                <p>Designed to be lightweight, quick, and native to the GNOME environment.</p>
+                <h2>What spriteview Does</h2>
+                <p>Lightweight and native — built for pixel artists, game developers, and anyone who opens a lot of PNGs.</p>
             </div>
 
             <div class="features-grid">

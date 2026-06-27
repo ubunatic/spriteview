@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Packaging and Distribution
 
 This document explains our modular design and single-file packaging approach for the Nautilus Sprite View extension.

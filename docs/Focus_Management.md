@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # GTK4 Focus Management and Label Selection
 
 This document outlines the learnings, conventions, and architectural patterns established for managing widget focus, text selection, and window dismissal in the Nautilus Sprite View application.

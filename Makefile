@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Uwe Jugel
+# SPDX-License-Identifier: AGPL-3.0-or-later
 .PHONY: ⚙️  # make all targets phony
 
 SHELL := bash
@@ -38,6 +40,8 @@ test: ⚙️  ## run syntax check and unit tests
 	python3 -m py_compile $(EXTENSION_NAME)
 	python3 -m unittest discover -s tests
 	@echo "✅ Extension syntax check and unit tests passed"
+	reuse lint
+	@echo "✅ REUSE license compliance passed"
 
 pack: ⚙️  ## pack the app into a single self-contained file
 	python3 scripts/pack.py

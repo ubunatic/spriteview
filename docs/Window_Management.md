@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # GTK4 Window Lifecycle and Transient Management
 
 This document records key lessons learned about window destruction in GTK4 / PyGObject and proposes a resilient, production-ready **Window Management and Lifecycle System** to prevent orphaned windows.

@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Distribution Compatibility and Installation
 
 This document details the support matrix, dependencies, and distribution-specific setup for Nautilus SpriteView.
