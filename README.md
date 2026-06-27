@@ -1,82 +1,83 @@
 <!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-# Nautilus Image Preview Plugin
+# SpriteView
 
-Modern GNOME Files (Nautilus) Python extension. Compatible with modern Linux distributions (GNOME 43+ / Nautilus 43+).
+A lightweight GTK4 image viewer for Linux — built for pixel artists and developers.
+Run it from the terminal, set it as your default image viewer, or use it directly inside GNOME Files.
 
-<img src="website/assets/spriteview-screen-sheet-001.png" alt="Nautilus SpriteView Animation Player" width="480">
-<img src="website/assets/spriteview-screen-color-info.png" alt="Nautilus SpriteView Color Analyzer" width="480">
+<img src="website/assets/spriteview-screen-sheet-001.png" alt="SpriteView Animation Player" width="480">
+<img src="website/assets/spriteview-screen-color-info.png" alt="SpriteView Color Analyzer" width="480">
 
-This plugin adds a `"Preview Image"` (or `"Preview Sprite Sheet"`) action to the right-click context menu of image files (`.png`, `.gif`, `.bmp`, `.jpg`, `.jpeg`, `.webp`). When activated, it opens a custom split-pane GTK4 window to preview the image:
-*   **Crisp Scaling**: Small pixel-art/PNG/GIF/BMP images undergo nearest-neighbor (point) integer upscaling beforehand. This ensures they are rendered with crisp, sharp pixels rather than a blurry filter when scaled to fit the window.
-*   **Multi-File Selection**: Select multiple individual image files simultaneously in Nautilus to load them directly as sequential frames for custom animation sequence playback.
-*   **Properties Panel**: A dedicated sidebar displays metadata properties (filename, original dimensions, file size, frame count).
-*   **Color Palette**: Automatically extracts the top 16 most common colors in the active frame and displays them as colored swatches inside a wrapping layout grid. Swatch widgets are recycled dynamically to preserve hover tooltips even while animations play.
-*   **Interactive Color Info**: Clicking on any color swatch reveals a details panel in the sidebar showing its visual representation, closest ANSI 256 color index/name (determined by Euclidean distance), shorthand hex format (`#fff`), full hex (including alpha transparency if present), and RGBA formats.
-*   **Playback Controls**: For sprite sequences, it provides animation controls (Play, Pause, Step Next, Step Prev), a clickable visual frame thumbnail strip, a **dynamic FPS (Frames Per Second) speed control** (using a `Gtk.SpinButton` from `1` to `60` FPS), and **multiple playback modes** (Loop, Ping-Pong, and Once via a modern GTK4 `Gtk.DropDown` selector).
-*   **Persistent Settings**: Access a standalone Settings window via the title bar hamburger menu to configure your default FPS, toggle "Remember FPS" (by sheet or by directory scope), select default playback mode, and customize sequence separators/filename matching patterns.
-*   **Native About Page**: Includes a custom About page featuring an embedded, pixel-perfect rendering of the first sprite frame as the program logo.
+## Features
 
-## Installation
+- **Crisp scaling** — nearest-neighbor integer upscaling keeps pixel art sharp
+- **Sprite animation** — play/pause/step, 1–60 FPS spinbutton, loop/ping-pong/once modes
+- **Smart sequencing** — select one frame, SpriteView detects and loads the full sequence
+- **Multi-file** — pass multiple files or a folder directly from the CLI
+- **Color palette** — extracts top 16 colors per frame with ANSI 256 / hex / RGBA detail on click
+- **Properties panel** — filename, dimensions, file size, frame count
+- **Export** — headless PNG/GIF/WebM/ICO export, or `--export` to open the advanced GUI dialog
+- **Persistent settings** — default FPS, sequence separators, filename patterns
+- **GNOME Files integration** — right-click "Preview Image" / "Preview Sprite Sheet" in Nautilus
+- **Desktop integration** — `.desktop` entry with MIME associations and "Open With" support
 
-### 1. Prerequisites
-
-Ensure you have the Python 3 bindings for Nautilus components installed on your distribution:
-
-```bash
-# Ubuntu / Debian / Linux Mint
-sudo apt install python3-nautilus
-
-# Fedora / RHEL
-sudo dnf install nautilus-python
-
-# Arch Linux / Manjaro
-sudo pacman -S nautilus-python
-```
-
-### 2. Install the Plugin
-
-You can install the plugin with a single command:
+## Install
 
 ```bash
 curl -sSL https://codeberg.org/nautilus-spriteview/raw/branch/main/scripts/install.sh | bash
 ```
 
-## Make Targets
+The script installs the `spriteview` CLI to `~/.local/bin/`, registers the `.desktop` entry
+and MIME types, and (if `python3-nautilus` is present) installs the Nautilus extension.
 
-This project features a self-documenting Makefile conforming to our Make conventions. Run `make` (or `make help`) to view available targets:
+**Prerequisites for GNOME Files integration** (optional):
 
 ```bash
-$ make
-  help          show this help
-  test          run syntax check on the Python extension
-  test-sprites  generate test sprite files (sprites/sprite_0001.png to sprites/sprite_0004.png)
-  install       install the extension and restart Nautilus
-  uninstall     uninstall the extension and restart Nautilus
-  restart       restart Nautilus to apply changes
+sudo apt install python3-nautilus   # Ubuntu / Debian / Linux Mint
+sudo dnf install nautilus-python    # Fedora / RHEL
+sudo pacman -S nautilus-python      # Arch / Manjaro
+```
+
+## Usage
+
+```bash
+spriteview <image>                  # preview a single image
+spriteview <image> [<image> ...]    # preview as animation sequence
+spriteview <folder>                 # open file picker at folder
+spriteview <image> --export gif     # headless export (png, gif, webm, ico)
+spriteview <image> --export         # open advanced export dialog
+spriteview --settings               # open settings window
+spriteview --about                  # open about dialog
 ```
 
 ## Project Structure
 
-*   [Makefile](file:///home/uwe/projects/nautilus/Makefile) — The self-documenting Makefile.
-*   [sprite_view.py](file:///home/uwe/projects/nautilus/sprite_view.py) — The Nautilus Python extension.
-*   [scripts/install.sh](file:///home/uwe/projects/nautilus/scripts/install.sh) — A POSIX/Bash conformant installation script.
+```
+sprite_view.py          entry point and CLI (also the Nautilus extension)
+sprite_view/            app modules
+  ui/preview.py         main viewer window
+  ui/settings.py        settings dialog
+  ui/about.py           about dialog
+  settings.py           settings persistence
+  logo.py               app icon / logo rendering
+  utils.py              color utilities, sequence detection
+scripts/install.sh      installation script
+scripts/pack.py         packs modules into a single self-contained file
+spriteview.desktop      desktop entry (MIME associations, actions)
+website/                project website (fully static)
+```
 
-## Code Standards Adhered To
+## Development
 
-1.  **Make Standards**:
-    *   Phony sentinel `⚙️` used to keep targets clean.
-    *   Self-documenting target descriptions matching regex format.
-    *   Aligned assignment operators.
-2.  **Bash Standards**:
-    *   Header configuration `set -euo pipefail`.
-    *   Strict usage of `if test` instead of `[`/`]` or `[[`/`]]`.
-    *   Single-line `then` statements and indentation conventions matching `Bash.md`.
-3.  **Python, Gtk4 & Nautilus**:
-    *   Compatible with the Nautilus 4.0+ (GTK4) model-based API (no `window` arguments in provider methods).
-    *   Safely instantiates and presents Gtk4 windows inside the Nautilus main loop without calling blocking main loops (`Gtk.main()`) or unsafe exits.
-    *   Leverages `GdkPixbuf` and `Gdk.Texture` to perform nearest-neighbor scaling dynamically.
+```bash
+make test               # syntax check, unit tests, REUSE lint
+make install            # pack, install, restart Nautilus
+make test-desktop       # validate installed .desktop entry and test gio launch
+make uninstall          # remove all installed files
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for coding conventions and the issue process.
 
 ## License
 
-AGPL 3.0
+[AGPL-3.0-or-later](LICENSES/AGPL-3.0-or-later.txt)
