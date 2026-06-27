@@ -7,4 +7,7 @@ Adhere to the following conventions.
   smart indent!
 - Make/Makefile @docs/Make.md,
   ⚙️ phony sentinel, self-doc help, build dependency pattern
+- GTK4 / GObject UI
+  - Use NON_UNIQUE application flags to prevent background instances from swallowing CLI files.
+  - Run integration smoke tests (test_integration.py) to catch Gtk startup crashes/AttributeErrors.
 <!-- claudeconfig:end Language Conventions -->
