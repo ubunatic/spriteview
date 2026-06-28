@@ -127,6 +127,38 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.btn_folder_next.connect("clicked", lambda b: self._load_sibling_image(1))
         header_bar.pack_start(self.btn_folder_next)
 
+        # Split Save Button layout
+        save_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        save_box.add_css_class("linked")
+
+        self.btn_save = Gtk.Button()
+        self.btn_save.set_icon_name("document-save-symbolic")
+        self.btn_save.set_tooltip_text("Save cropped image(s) (Ctrl+S)")
+        self.btn_save.connect("clicked", lambda b: self._save_with_confirmation())
+        self.btn_save.set_sensitive(False)
+        save_box.append(self.btn_save)
+
+        self.btn_save_dropdown = Gtk.MenuButton()
+        self.btn_save_dropdown.set_icon_name("pan-down-symbolic")
+        self.btn_save_dropdown.set_tooltip_text("Save Options")
+        self.btn_save_dropdown.set_sensitive(False)
+        
+        save_menu = Gio.Menu()
+        save_menu.append("Save", "win.save-instant")
+        save_menu.append("Save as...", "win.save-as")
+        self.btn_save_dropdown.set_menu_model(save_menu)
+        save_box.append(self.btn_save_dropdown)
+
+        header_bar.pack_start(save_box)
+
+        # Crop button in HeaderBar (toggles crop mode)
+        self.btn_crop = Gtk.ToggleButton()
+        self.btn_crop.set_icon_name("image-crop-symbolic")
+        self.btn_crop.set_tooltip_text("Toggle Crop Mode")
+        self.btn_crop.connect("toggled", self._on_crop_toggled)
+        self.btn_crop.set_sensitive(False)
+        header_bar.pack_start(self.btn_crop)
+
         # Create hamburger menu button backed by Gio.Menu + PopoverMenu so that
         # items use the native 'menuitem' CSS node (correct weight and spacing).
         self.menu_button = Gtk.MenuButton()
@@ -140,6 +172,8 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             self.add_action(action)
 
         _add_action("open",             self._on_open_clicked)
+        _add_action("save-instant",     lambda a, p: self._save_with_confirmation())
+        _add_action("save-as",          lambda a, p: self._save_as())
         _add_action("export-png",       self._on_export_png_clicked)
         _add_action("export-gif-frame", self._on_export_gif_frame_clicked)
         _add_action("export-ico",       self._on_export_ico_clicked)
@@ -157,6 +191,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.thumb_pics: List[Gtk.Picture] = []
         self.original_dimensions = []
         self.original_pixbufs: List[GdkPixbuf.Pixbuf] = []
+        self.original_pil_images: List[Image.Image] = []
         self.frame_palettes = []
         self.swatch_colors = [(0, 0, 0, 255)] * 16
         self.selected_color = (0, 0, 0, 255)
@@ -166,6 +201,10 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.is_playing = False
         self.play_direction = 1
         self.timer_id = None
+
+        # State variables for save & scaling
+        self.scale_factor = 1
+        self.has_unsaved_changes = False
 
         # Root split-pane layout
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -194,7 +233,20 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.picture.props.content_fit = Gtk.ContentFit.CONTAIN
         self.picture.set_vexpand(True)
         self.picture.set_hexpand(True)
-        left_box.append(self.picture)
+
+        # Wrap picture in an Overlay for the crop drawing area and crop button
+        overlay = Gtk.Overlay()
+        overlay.set_vexpand(True)
+        overlay.set_hexpand(True)
+        overlay.set_child(self.picture)
+
+        # Initialize modular CropManager
+        from sprite_view.ui.crop import CropManager
+        self.crop_manager = CropManager(self)
+        overlay.add_overlay(self.crop_manager.crop_overlay)
+        overlay.add_overlay(self.crop_manager.btn_overlay_crop)
+
+        left_box.append(overlay)
 
         # Setup Sidebar properties (right pane)
         title_lbl = Gtk.Label()
@@ -337,10 +389,11 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
 
         right_box.append(self.color_details_box)
 
-        # Close window when ESC key is pressed
+        # Close window when ESC key is pressed or close requested
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_controller)
+        self.connect("close-request", self._on_close_request)
 
         # Setup indicator row (centered on its own row below picture)
         self.lbl_indicator = Gtk.Label(label="")
@@ -461,11 +514,23 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
 
     def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
         if keyval == Gdk.KEY_Escape:
+            if hasattr(self, 'crop_manager') and self.crop_manager.crop_active:
+                self.crop_manager.reset()
+                return True
             self.close()
             return True
+            
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            if hasattr(self, 'crop_manager') and self.crop_manager.crop_active:
+                self.crop_manager.crop_in_memory()
+                return True
+                
         is_ctrl = (state & Gdk.ModifierType.CONTROL_MASK) != 0
         if is_ctrl and keyval in (Gdk.KEY_w, Gdk.KEY_W, Gdk.KEY_q, Gdk.KEY_Q):
             self.close()
+            return True
+        if is_ctrl and keyval in (Gdk.KEY_s, Gdk.KEY_S):
+            self._save_with_confirmation()
             return True
             
         # Support Page Up / Page Down keys for folder navigation
@@ -604,10 +669,19 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.textures = []
         self.original_dimensions = []
         self.original_pixbufs = []
+        self.original_pil_images = []
         self.frame_palettes = []
         self.has_mixed_sizes = False
         self.canvas_size = (0, 0)
         self.current_frame = 0
+
+        # Reset crop helpers and save button state
+        if hasattr(self, 'crop_manager') and self.crop_manager:
+            self.crop_manager.reset()
+        if hasattr(self, 'btn_crop') and self.btn_crop:
+            self.btn_crop.set_sensitive(False)
+        self.has_unsaved_changes = False
+        self._update_save_button()
 
         # Phase 1: decode originals and extract palettes
         loaded_paths = []
@@ -617,6 +691,12 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
                 self.original_dimensions.append((pixbuf.get_width(), pixbuf.get_height()))
                 self.frame_palettes.append(self._extract_palette_from_pixbuf(pixbuf, 16))
                 self.original_pixbufs.append(pixbuf)
+                
+                # Load PIL image
+                img = Image.open(path)
+                img.load()
+                self.original_pil_images.append(img)
+                
                 loaded_paths.append(path)
             except Exception as e:
                 print(f"Error loading frame {path}: {e}")
@@ -710,6 +790,8 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         # Update UI frames
         self._update_frame()
         self._update_play_pause_button()
+        if hasattr(self, 'btn_crop') and self.btn_crop:
+            self.btn_crop.set_sensitive(len(self.file_paths) > 0)
 
         # Start timer if playing and not already started by value-changed signal
         if is_anim and self.timer_id is None:
@@ -974,6 +1056,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
     def _build_textures(self, align: int) -> None:
         self.textures = []
         canvas_w, canvas_h = self.canvas_size
+        self.scale_factor = 1
         for i, pixbuf in enumerate(self.original_pixbufs):
             pb = self._pad_pixbuf(pixbuf, canvas_w, canvas_h, align) if self.has_mixed_sizes else pixbuf
             w, h = pb.get_width(), pb.get_height()
@@ -982,6 +1065,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
                 scale_factor = max(1, min(1024 // w, 1024 // h))
                 if scale_factor > 1:
                     pb = pb.scale_simple(w * scale_factor, h * scale_factor, GdkPixbuf.InterpType.NEAREST)
+                    self.scale_factor = scale_factor
             self.textures.append(pixbuf_to_texture(pb))
 
     def _on_align_btn_clicked(self, button: Gtk.Button, align: int) -> None:
@@ -1232,6 +1316,246 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             self.set_focus(self.btn_play_pause)
         else:
             self.set_focus(None)
+        return False
+
+    def _pad_pil_image(self, img: Image.Image, canvas_w: int, canvas_h: int, align: int) -> Image.Image:
+        src_w, src_h = img.size
+        if src_w == canvas_w and src_h == canvas_h:
+            return img
+        canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+        row, col = align // 3, align % 3
+        dx = (canvas_w - src_w) * col // 2
+        dy = (canvas_h - src_h) * row // 2
+        canvas.paste(img, (dx, dy))
+        canvas.format = img.format
+        canvas.info = img.info.copy()
+        return canvas
+
+    def _update_save_button(self) -> None:
+        has_files = bool(self.file_paths)
+        if hasattr(self, 'btn_save') and self.btn_save:
+            self.btn_save.set_sensitive(has_files and self.has_unsaved_changes)
+            if self.has_unsaved_changes:
+                self.btn_save.add_css_class("suggested-action")
+            else:
+                self.btn_save.remove_css_class("suggested-action")
+        if hasattr(self, 'btn_save_dropdown') and self.btn_save_dropdown:
+            self.btn_save_dropdown.set_sensitive(has_files)
+
+    def _save_with_confirmation(self) -> None:
+        if len(self.file_paths) > 1:
+            alert = Gtk.AlertDialog.new()
+            alert.set_message("Save Sequence Images")
+            alert.set_detail("Do you want to save the cropped images for all frames in the sequence, or only the current frame?")
+            alert.set_buttons(["Save All Frames", "Save Current Frame Only", "Cancel"])
+            alert.set_cancel_button(2)
+            alert.set_default_button(0)
+            
+            def on_choose(dialog, result, user_data):
+                try:
+                    idx = dialog.choose_finish(result)
+                    if idx == 0:
+                        self._save_images(save_all=True)
+                    elif idx == 1:
+                        self._save_images(save_all=False)
+                except Exception as e:
+                    print(f"Error choosing dialog option: {e}")
+            
+            alert.choose(self, None, on_choose, None)
+        else:
+            self._save_images(save_all=False)
+
+    def _save_images(self, save_all: bool) -> None:
+        frames_to_save = range(len(self.file_paths)) if save_all else [self.current_frame]
+        
+        saved_paths = []
+        errors = []
+        
+        for idx in frames_to_save:
+            path = self.file_paths[idx]
+            img = self.original_pil_images[idx]
+            
+            save_params = {}
+            if img.format == "PNG":
+                for key in ['transparency', 'dpi', 'icc_profile', 'exif']:
+                    if key in img.info:
+                        save_params[key] = img.info[key]
+            elif img.format in ("JPEG", "MPO"):
+                for key in ['exif', 'icc_profile', 'quality', 'dpi', 'subsampling']:
+                    if key in img.info:
+                        save_params[key] = img.info[key]
+                if img.mode == "RGBA":
+                    img = img.convert("RGB")
+            elif img.format == "GIF":
+                for key in ['transparency', 'duration', 'loop', 'comment']:
+                    if key in img.info:
+                        save_params[key] = img.info[key]
+            
+            try:
+                # Save the image
+                img.save(path, format=img.format, **save_params)
+                saved_paths.append(path)
+            except Exception as e:
+                errors.append(f"{os.path.basename(path)}: {str(e)}")
+                
+        if errors:
+            self._show_error_dialog(f"Errors occurred while saving:\n" + "\n".join(errors))
+        
+        if saved_paths:
+            # Update UI for saved files
+            self.has_unsaved_changes = False
+            self._update_save_button()
+            self._update_frame()
+            
+            # Show notification
+            filename = os.path.basename(saved_paths[0])
+            msg = f"Saved {len(saved_paths)} images" if len(saved_paths) > 1 else f"Saved {filename}"
+            try:
+                if not Notify.is_initted():
+                    Notify.init("NautilusPreview")
+                n = Notify.Notification.new("Save Successful", msg, "info")
+                n.show()
+            except Exception:
+                pass
+
+    def _on_crop_toggled(self, button: Gtk.ToggleButton) -> None:
+        active = button.get_active()
+        if active:
+            self.crop_manager.crop_active = True
+            if not self.crop_manager.crop_box:
+                canvas_w, canvas_h = self.canvas_size
+                if canvas_w > 0 and canvas_h > 0:
+                    cx1 = int(round(canvas_w * 0.25))
+                    cy1 = int(round(canvas_h * 0.25))
+                    cx2 = int(round(canvas_w * 0.75))
+                    cy2 = int(round(canvas_h * 0.75))
+                    
+                    if cx2 <= cx1:
+                        cx2 = min(canvas_w, cx1 + 10)
+                    if cy2 <= cy1:
+                        cy2 = min(canvas_h, cy1 + 10)
+                        
+                    self.crop_manager.crop_box = (cx1, cy1, cx2, cy2)
+        else:
+            self.crop_manager.reset()
+        self.crop_manager.crop_overlay.queue_draw()
+        self.crop_manager._update_crop_button_visibility()
+
+    def _save_as(self) -> None:
+        if not self.file_paths:
+            return
+            
+        current_path = self.file_paths[self.current_frame]
+        base = os.path.basename(current_path)
+        name, ext_ext = os.path.splitext(base)
+        ext = ext_ext.lstrip('.').lower() or "png"
+        
+        dialog = Gtk.FileDialog.new()
+        dialog.set_title("Save As")
+        dialog.set_initial_name(base)
+        
+        parent_dir = os.path.dirname(current_path)
+        gio_folder = Gio.File.new_for_path(parent_dir)
+        dialog.set_initial_folder(gio_folder)
+        
+        store = Gio.ListStore.new(Gtk.FileFilter)
+        f = Gtk.FileFilter()
+        f.set_name(f"{ext.upper()} Files (*.{ext})")
+        f.add_pattern(f"*.{ext}")
+        store.append(f)
+        dialog.set_filters(store)
+        dialog.set_default_filter(f)
+        
+        def on_saved(dialog_obj, result, user_data):
+            try:
+                gfile = dialog_obj.save_finish(result)
+                if gfile:
+                    dest_path = gfile.get_path()
+                    if dest_path:
+                        img = self.original_pil_images[self.current_frame]
+                        
+                        save_params = {}
+                        if img.format == "PNG":
+                            for key in ['transparency', 'dpi', 'icc_profile', 'exif']:
+                                if key in img.info:
+                                    save_params[key] = img.info[key]
+                        elif img.format in ("JPEG", "MPO"):
+                            for key in ['exif', 'icc_profile', 'quality', 'dpi', 'subsampling']:
+                                if key in img.info:
+                                    save_params[key] = img.info[key]
+                            if img.mode == "RGBA":
+                                img = img.convert("RGB")
+                        elif img.format == "GIF":
+                            for key in ['transparency', 'duration', 'loop', 'comment']:
+                                if key in img.info:
+                                    save_params[key] = img.info[key]
+                        
+                        img.save(dest_path, format=img.format, **save_params)
+                        
+                        self.file_paths[self.current_frame] = dest_path
+                        self.has_unsaved_changes = False
+                        self._update_save_button()
+                        self._update_frame()
+            except Exception as e:
+                print(f"Error in Save As dialog: {e}")
+                
+        dialog.save(self, None, on_saved, None)
+
+    def _on_close_request(self, window) -> bool:
+        if hasattr(self, 'has_unsaved_changes') and self.has_unsaved_changes:
+            alert = Gtk.AlertDialog.new()
+            alert.set_message("Unsaved Changes")
+            alert.set_detail("You have cropped the image in memory but haven't saved it to disk yet.")
+            alert.set_buttons(["Save and Exit", "Discard and Exit", "Cancel"])
+            alert.set_cancel_button(2)
+            alert.set_default_button(0)
+            
+            def on_choose(dialog, result, user_data):
+                try:
+                    idx = dialog.choose_finish(result)
+                    if idx == 0: # Save and Exit
+                        # Trigger save sequence/image
+                        if len(self.file_paths) > 1:
+                            # Ask confirm to save all sequence images
+                            alert_seq = Gtk.AlertDialog.new()
+                            alert_seq.set_message("Save Sequence Images")
+                            alert_seq.set_detail("Do you want to save the cropped images for all frames in the sequence, or only the current frame?")
+                            alert_seq.set_buttons(["Save All Frames", "Save Current Frame Only", "Cancel"])
+                            alert_seq.set_cancel_button(2)
+                            alert_seq.set_default_button(0)
+                            
+                            def on_choose_seq(dialog_seq, result_seq, user_data_seq):
+                                try:
+                                    idx_seq = dialog_seq.choose_finish(result_seq)
+                                    if idx_seq == 0:
+                                        self._save_images(save_all=True)
+                                        self.has_unsaved_changes = False
+                                        self.close()
+                                    elif idx_seq == 1:
+                                        self._save_images(save_all=False)
+                                        self.has_unsaved_changes = False
+                                        self.close()
+                                except Exception as ex:
+                                    print(f"Error choosing sequence dialog: {ex}")
+                            
+                            alert_seq.choose(self, None, on_choose_seq, None)
+                        else:
+                            self._save_images(save_all=False)
+                            self.has_unsaved_changes = False
+                            self.close()
+                    elif idx == 1: # Discard and Exit
+                        self.has_unsaved_changes = False
+                        self.close()
+                except Exception as e:
+                    print(f"Error closing dialog choice: {e}")
+            
+            alert.choose(self, None, on_choose, None)
+            return True # Prevent default close
+            
+        # Clean up timer
+        if self.timer_id is not None:
+            GLib.source_remove(self.timer_id)
+            self.timer_id = None
         return False
 
 

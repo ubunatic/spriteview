@@ -103,7 +103,8 @@ class TestImagePreviewWindow(unittest.TestCase):
     @patch("gi.repository.GdkPixbuf.Pixbuf.new_from_file")
     @patch("gi.repository.GLib.timeout_add")
     @patch("gi.repository.GLib.source_remove")
-    def test_load_sequence(self, mock_source_remove, mock_timeout_add, mock_new_from_file):
+    @patch("PIL.Image.open")
+    def test_load_sequence(self, mock_image_open, mock_source_remove, mock_timeout_add, mock_new_from_file):
         win = MagicMock(spec=ImagePreviewWindow)
         win.timer_id = 123
         win.settings = {}
@@ -154,6 +155,65 @@ class TestImagePreviewWindow(unittest.TestCase):
         win._update_folder_navigation_sensitivity.assert_called_once()
         # Verify play/pause status and UI changes are called
         win._update_play_pause_button.assert_called_once()
+
+    def test_get_crop_box_widget_coords(self):
+        from sprite_view.ui.crop import CropManager
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.scale_factor = 2
+        
+        manager = CropManager(win)
+        manager.crop_box = (10, 20, 50, 60)
+        
+        bounds = {
+            'x_min': 100,
+            'y_min': 150,
+            'scale': 1.5
+        }
+        cx1, cy1, cx2, cy2 = manager._get_crop_box_widget_coords(bounds)
+        self.assertEqual((cx1, cy1, cx2, cy2), (130, 210, 250, 330))
+
+    def test_crop_in_memory(self):
+        from sprite_view.ui.crop import CropManager
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.canvas_size = (100, 100)
+        win.has_mixed_sizes = False
+        win.current_align = 4
+        win.current_frame = 0
+        
+        win.picture = MagicMock()
+        win.textures = [MagicMock()]
+        
+        mock_pixbuf = MagicMock()
+        mock_subpixbuf = MagicMock()
+        mock_pixbuf.new_subpixbuf.return_value = mock_subpixbuf
+        win.original_pixbufs = [mock_pixbuf]
+        
+        mock_pil_img = MagicMock()
+        mock_cropped_pil = MagicMock()
+        mock_pil_img.crop.return_value = mock_cropped_pil
+        mock_pil_img.format = "PNG"
+        mock_pil_img.info = {"dpi": (72, 72)}
+        win.original_pil_images = [mock_pil_img]
+        
+        win.thumb_pics = []
+        
+        # Mock methods that are called inside crop_in_memory
+        win._extract_palette_from_pixbuf.return_value = []
+        win._build_textures = MagicMock()
+        win._update_save_button = MagicMock()
+        win._update_frame = MagicMock()
+        
+        manager = CropManager(win)
+        manager.crop_active = True
+        manager.crop_box = (10.1, 20.2, 50.3, 60.4)
+        
+        manager.crop_in_memory()
+        
+        mock_pixbuf.new_subpixbuf.assert_called_once_with(10, 20, 40, 40)
+        mock_pil_img.crop.assert_called_once_with((10, 20, 50, 60))
+        
+        self.assertEqual(win.canvas_size, (40, 40))
+        self.assertEqual(win.has_unsaved_changes, True)
 
 if __name__ == "__main__":
     unittest.main()

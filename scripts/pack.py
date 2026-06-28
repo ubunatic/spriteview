@@ -10,6 +10,7 @@ FILES_TO_PACK = [
     "sprite_view/logo.py",
     "sprite_view/ui/about.py",
     "sprite_view/ui/settings.py",
+    "sprite_view/ui/crop.py",
     "sprite_view/ui/preview.py",
     "sprite_view.py"
 ]
