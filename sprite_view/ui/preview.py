@@ -238,6 +238,10 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self._source_has_mixed_sizes = False
         self._zoom = 0.0
         self._applying_zoom = False
+        self._mouse_x = 0.0
+        self._mouse_y = 0.0
+        self._zoom_center_px = None
+        self._zoom_center_py = None
 
         # Root split-pane layout
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -274,10 +278,6 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.scroll_zoom.set_hexpand(True)
         self.scroll_zoom.set_child(self.picture)
 
-        scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
-        scroll.connect("scroll", self._on_scroll)
-        self.scroll_zoom.add_controller(scroll)
-
         # Outer overlay for border drawing and crop manager
         self.outer_overlay = Gtk.Overlay()
         self.outer_overlay.set_vexpand(True)
@@ -303,6 +303,17 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         picture_click = Gtk.GestureClick()
         picture_click.connect("pressed", self._on_picture_clicked)
         self.crop_manager.crop_overlay.add_controller(picture_click)
+
+        scroll = Gtk.EventControllerScroll.new(
+            Gtk.EventControllerScrollFlags.VERTICAL
+        )
+        scroll.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        scroll.connect("scroll", self._on_scroll)
+        self.outer_overlay.add_controller(scroll)
+
+        motion = Gtk.EventControllerMotion.new()
+        motion.connect("motion", self._on_mouse_motion)
+        self.outer_overlay.add_controller(motion)
 
         left_box.append(self.outer_overlay)
 
@@ -592,20 +603,96 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
     def _on_picture_paintable_changed(self, *args) -> None:
         self.border_overlay.queue_draw()
 
-    def _on_scroll(self, controller, dx, dy) -> bool:
+    def _get_zoom_levels(self) -> list[float]:
+        src = self._source_pixbufs[self.current_frame]
+        sw, sh = src.get_width(), src.get_height()
+        max_dim = self.settings.get("max_zoom_dim", 4096)
+        max_zoom_w = max_dim / sw
+        max_zoom_h = max_dim / sh
+        max_zoom = min(max_zoom_w, max_zoom_h)
+
+        levels = [0.1, 0.125, 0.167, 0.2, 0.25, 0.33, 0.5, 0.67]
+        for z in range(1, 10):
+            if z > max_zoom:
+                break
+            levels.append(float(z))
+        z = 10
+        while z <= max_zoom:
+            levels.append(float(z))
+            z += 2
+        return levels
+
+    def _on_mouse_motion(self, controller, x, y) -> None:
+        self._mouse_x = x
+        self._mouse_y = y
+
+    def _get_source_pixel_at_screen(self, sx, sy):
+        """Convert screen coordinates to source image pixel coordinates."""
         if self._zoom == 0:
             w = self.picture.get_width()
             h = self.picture.get_height()
             src = self._source_pixbufs[self.current_frame]
             sw, sh = src.get_width(), src.get_height()
             effective = min(w / sw, h / sh) if w > 0 and h > 0 else 1.0
-            self._zoom = effective
-        if dy < 0:
-            self._zoom *= 1.25
+            disp_w = sw * effective
+            disp_h = sh * effective
+            img_x = (w - disp_w) / 2
+            img_y = (h - disp_h) / 2
+            px = (sx - img_x) / effective
+            py = (sy - img_y) / effective
         else:
-            self._zoom /= 1.25
-        self._zoom = max(0.1, min(100.0, self._zoom))
+            bounds = self._get_picture_viewport_bounds()
+            px = (sx - bounds['pic_x']) / self._zoom
+            py = (sy - bounds['pic_y']) / self._zoom
+        return px, py
+
+    def _adjust_scroll_for_zoom(self, src_x, src_y, screen_x, screen_y) -> None:
+        """After zoom change, adjust scroll so source pixel stays at (screen_x, screen_y)."""
+        if self._zoom == 0:
+            return
+        bounds = self._get_picture_viewport_bounds()
+        new_pic_w = bounds['pic_w']
+        new_pic_h = bounds['pic_h']
+        outer_w = bounds['outer_w']
+        outer_h = bounds['outer_h']
+        desired_pic_x = screen_x - src_x * self._zoom
+        desired_pic_y = screen_y - src_y * self._zoom
+        hadj = self.scroll_zoom.get_hadjustment()
+        vadj = self.scroll_zoom.get_vadjustment()
+        if new_pic_w > outer_w and hadj:
+            hadj.set_value(-desired_pic_x)
+        if new_pic_h > outer_h and vadj:
+            vadj.set_value(-desired_pic_y)
+
+    def _on_scroll(self, controller, dx, dy) -> bool:
+        levels = self._get_zoom_levels()
+
+        if self._zoom == 0:
+            w = self.picture.get_width()
+            h = self.picture.get_height()
+            src = self._source_pixbufs[self.current_frame]
+            sw, sh = src.get_width(), src.get_height()
+            effective = min(w / sw, h / sh) if w > 0 and h > 0 else 1.0
+            current = min(levels, key=lambda z: abs(z - effective))
+        else:
+            current = self._zoom
+
+        src_x, src_y = self._get_source_pixel_at_screen(self._mouse_x, self._mouse_y)
+
+        try:
+            idx = levels.index(current)
+        except ValueError:
+            idx = min(range(len(levels)), key=lambda i: abs(levels[i] - current))
+        if dy < 0:
+            idx = min(idx + 1, len(levels) - 1)
+        else:
+            idx = max(idx - 1, 0)
+        self._zoom = levels[idx]
+
+        self._zoom_center_px = src_x
+        self._zoom_center_py = src_y
         self._apply_zoom()
+        self._adjust_scroll_for_zoom(src_x, src_y, self._mouse_x, self._mouse_y)
         return True
 
     def _apply_zoom(self) -> None:
@@ -627,10 +714,11 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             self._zoom_lbl.set_text("Auto")
             print(f"ZOOM: auto src={pw}x{ph} tex={self.textures[idx].get_width()}x{self.textures[idx].get_height()}")
         else:
+            max_dim = self.settings.get("max_zoom_dim", 4096)
             new_w = max(1, int(pw * self._zoom))
             new_h = max(1, int(ph * self._zoom))
-            new_w = min(new_w, 8192)
-            new_h = min(new_h, 8192)
+            new_w = min(new_w, max_dim)
+            new_h = min(new_h, max_dim)
             print(f"ZOOM: zoom={self._zoom:.3f} src={pw}x{ph} -> dst={new_w}x{new_h}")
             scaled = pixbuf.scale_simple(new_w, new_h, GdkPixbuf.InterpType.NEAREST)
             texture = pixbuf_to_texture(scaled)
@@ -747,8 +835,18 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             Gdk.KEY_9: 9.0, Gdk.KEY_KP_9: 9.0,
         }
         if keyval in zoom_map:
-            self._zoom = zoom_map[keyval]
-            self._apply_zoom()
+            new_zoom = zoom_map[keyval]
+            if self._zoom_center_px is not None and self._zoom != 0:
+                bounds = self._get_picture_viewport_bounds()
+                old_zoom = self._zoom
+                screen_x = bounds['pic_x'] + self._zoom_center_px * old_zoom
+                screen_y = bounds['pic_y'] + self._zoom_center_py * old_zoom
+                self._zoom = new_zoom
+                self._apply_zoom()
+                self._adjust_scroll_for_zoom(self._zoom_center_px, self._zoom_center_py, screen_x, screen_y)
+            else:
+                self._zoom = new_zoom
+                self._apply_zoom()
             return True
 
         return False

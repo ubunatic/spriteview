@@ -20,7 +20,8 @@ def load_settings() -> dict:
         ],
         "saved_fps": {},
         "image_bg_color": "none",
-        "show_image_border": True
+        "show_image_border": True,
+        "max_zoom_dim": 4096
     }
     try:
         if os.path.exists(CONFIG_PATH):

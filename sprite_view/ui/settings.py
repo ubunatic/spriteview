@@ -110,6 +110,21 @@ class SettingsWindow(Gtk.Window):
         border_row.append(self.border_check)
         box.append(border_row)
 
+        # 5c. Max zoom dimension
+        max_dim_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        md_lbl = Gtk.Label(label="Max zoom texture size (px):")
+        md_lbl.set_halign(Gtk.Align.START)
+        md_lbl.set_hexpand(True)
+        max_dim_row.append(md_lbl)
+        md_adj = Gtk.Adjustment(
+            value=self.settings.get("max_zoom_dim", 4096),
+            lower=512, upper=16384, step_increment=512
+        )
+        self.max_dim_spin = Gtk.SpinButton(adjustment=md_adj, climb_rate=512, digits=0)
+        self.max_dim_spin.connect("value-changed", self._on_max_dim_changed)
+        max_dim_row.append(self.max_dim_spin)
+        box.append(max_dim_row)
+
         sep_seps = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         box.append(sep_seps)
 
@@ -238,6 +253,10 @@ class SettingsWindow(Gtk.Window):
         self.settings["image_bg_color"] = color
         if hasattr(self.parent_win, "_apply_image_bg_color"):
             self.parent_win._apply_image_bg_color(color)
+        save_settings(self.settings)
+
+    def _on_max_dim_changed(self, spin_button) -> None:
+        self.settings["max_zoom_dim"] = int(spin_button.get_value())
         save_settings(self.settings)
 
     def _on_border_toggled(self, check) -> None:
