@@ -96,6 +96,9 @@ uninstall: ⚙️  ## uninstall the extension and CLI, then restart Nautilus
 	@nautilus -q || echo "failed to restart nautilus, see errors above"
 	@echo "✅ Uninstalled extension and restarted Nautilus"
 
+run: ⚙️ install  ## open a simple test image in spriteview
+	spriteview sprites/sprite_0001.png
+
 restart: ⚙️  ## restart Nautilus to apply changes
 	@nautilus -q || true
 	@echo "🔄 Nautilus restarted (it will reload on next open)"
