@@ -157,7 +157,25 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.btn_crop.set_tooltip_text("Toggle Crop Mode")
         self.btn_crop.connect("toggled", self._on_crop_toggled)
         self.btn_crop.set_sensitive(False)
-        header_bar.pack_start(self.btn_crop)
+
+        self.btn_reset_view = Gtk.Button()
+        self.btn_reset_view.set_icon_name("document-revert-symbolic")
+        self.btn_reset_view.set_tooltip_text("Reset current view")
+        self.btn_reset_view.connect("clicked", self._on_reset_view_clicked)
+        self.btn_reset_view.set_sensitive(False)
+
+        self.btn_reload_view = Gtk.Button()
+        self.btn_reload_view.set_icon_name("view-refresh-symbolic")
+        self.btn_reload_view.set_tooltip_text("Reload current file(s) from disk")
+        self.btn_reload_view.connect("clicked", self._on_reload_view_clicked)
+        self.btn_reload_view.set_sensitive(False)
+
+        crop_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        crop_box.add_css_class("linked")
+        crop_box.append(self.btn_crop)
+        crop_box.append(self.btn_reset_view)
+        crop_box.append(self.btn_reload_view)
+        header_bar.pack_start(crop_box)
 
         # Create hamburger menu button backed by Gio.Menu + PopoverMenu so that
         # items use the native 'menuitem' CSS node (correct weight and spacing).
@@ -205,6 +223,12 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         # State variables for save & scaling
         self.scale_factor = 1
         self.has_unsaved_changes = False
+        self._source_pixbufs = []
+        self._source_pil_images = []
+        self._source_dimensions = []
+        self._source_frame_palettes = []
+        self._source_canvas_size = (0, 0)
+        self._source_has_mixed_sizes = False
 
         # Root split-pane layout
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -682,6 +706,8 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             self.btn_crop.set_sensitive(False)
         self.has_unsaved_changes = False
         self._update_save_button()
+        self._update_reset_button()
+        self._update_reload_button()
 
         # Phase 1: decode originals and extract palettes
         loaded_paths = []
@@ -725,6 +751,13 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             heights = [d[1] for d in self.original_dimensions]
             self.has_mixed_sizes = len(set(widths)) > 1 or len(set(heights)) > 1
             self.canvas_size = (max(widths), max(heights))
+
+        self._source_pixbufs = [pixbuf.copy() for pixbuf in self.original_pixbufs]
+        self._source_pil_images = [img.copy() for img in self.original_pil_images]
+        self._source_dimensions = list(self.original_dimensions)
+        self._source_frame_palettes = [list(palette) for palette in self.frame_palettes]
+        self._source_canvas_size = self.canvas_size
+        self._source_has_mixed_sizes = self.has_mixed_sizes
 
         self._build_textures(self.current_align)
 
@@ -792,6 +825,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self._update_play_pause_button()
         if hasattr(self, 'btn_crop') and self.btn_crop:
             self.btn_crop.set_sensitive(len(self.file_paths) > 0)
+        self._update_reload_button()
 
         # Start timer if playing and not already started by value-changed signal
         if is_anim and self.timer_id is None:
@@ -1341,6 +1375,17 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
                 self.btn_save.remove_css_class("suggested-action")
         if hasattr(self, 'btn_save_dropdown') and self.btn_save_dropdown:
             self.btn_save_dropdown.set_sensitive(has_files)
+        self._update_reset_button()
+
+    def _update_reset_button(self) -> None:
+        has_files = bool(self.file_paths)
+        if hasattr(self, 'btn_reset_view') and self.btn_reset_view:
+            self.btn_reset_view.set_sensitive(has_files and self.has_unsaved_changes)
+
+    def _update_reload_button(self) -> None:
+        has_files = bool(self.file_paths)
+        if hasattr(self, 'btn_reload_view') and self.btn_reload_view:
+            self.btn_reload_view.set_sensitive(has_files)
 
     def _save_with_confirmation(self) -> None:
         if len(self.file_paths) > 1:
@@ -1405,6 +1450,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             # Update UI for saved files
             self.has_unsaved_changes = False
             self._update_save_button()
+            self._update_reset_button()
             self._update_frame()
             
             # Show notification
@@ -1440,6 +1486,52 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             self.crop_manager.reset()
         self.crop_manager.crop_overlay.queue_draw()
         self.crop_manager._update_crop_button_visibility()
+
+    def _on_reset_view_clicked(self, button) -> None:
+        self._reset_current_view()
+
+    def _reset_current_view(self) -> None:
+        if not self.file_paths:
+            return
+        if not self._source_pixbufs or not self._source_pil_images:
+            return
+
+        if hasattr(self, 'crop_manager') and self.crop_manager:
+            self.crop_manager.reset()
+
+        self.original_pixbufs = [pixbuf.copy() for pixbuf in self._source_pixbufs]
+        self.original_pil_images = [img.copy() for img in self._source_pil_images]
+        self.original_dimensions = list(self._source_dimensions)
+        self.frame_palettes = [list(palette) for palette in self._source_frame_palettes]
+        self.canvas_size = self._source_canvas_size
+        self.has_mixed_sizes = self._source_has_mixed_sizes
+
+        self._build_textures(self.current_align)
+
+        if self.textures:
+            self.picture.set_paintable(self.textures[self.current_frame])
+
+        for idx, texture in enumerate(self.textures):
+            if idx < len(self.thumb_pics):
+                self.thumb_pics[idx].set_paintable(texture)
+
+        if hasattr(self, 'align_box'):
+            self.align_box.set_visible(len(self.file_paths) > 1 and self.has_mixed_sizes)
+
+        self.has_unsaved_changes = False
+        self._update_save_button()
+        self._update_reset_button()
+        self._update_frame()
+
+    def _on_reload_view_clicked(self, button) -> None:
+        self._reload_current_files()
+
+    def _reload_current_files(self) -> None:
+        if not self.file_paths:
+            return
+
+        current_path = self.file_paths[self.current_frame]
+        self._load_sequence(list(self.file_paths), current_path)
 
     def _save_as(self) -> None:
         if not self.file_paths:
@@ -1495,6 +1587,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
                         self.file_paths[self.current_frame] = dest_path
                         self.has_unsaved_changes = False
                         self._update_save_button()
+                        self._update_reset_button()
                         self._update_frame()
             except Exception as e:
                 print(f"Error in Save As dialog: {e}")

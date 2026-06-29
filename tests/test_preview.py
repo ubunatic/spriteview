@@ -215,5 +215,71 @@ class TestImagePreviewWindow(unittest.TestCase):
         self.assertEqual(win.canvas_size, (40, 40))
         self.assertEqual(win.has_unsaved_changes, True)
 
+    def test_reset_current_view_restores_baseline(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.file_paths = ["/mock/dir/frame_01.png"]
+        win.current_frame = 0
+        win.current_align = 4
+
+        source_pixbuf = MagicMock()
+        source_pixbuf.copy.return_value = "restored-pixbuf"
+        source_img = MagicMock()
+        source_img.copy.return_value = "restored-image"
+
+        win._source_pixbufs = [source_pixbuf]
+        win._source_pil_images = [source_img]
+        win._source_dimensions = [(100, 120)]
+        win._source_frame_palettes = [[(1, 2, 3, 4)]]
+        win._source_canvas_size = (100, 120)
+        win._source_has_mixed_sizes = True
+
+        win.original_pixbufs = [MagicMock()]
+        win.original_pil_images = [MagicMock()]
+        win.original_dimensions = [(40, 50)]
+        win.frame_palettes = [[(9, 9, 9, 9)]]
+        win.canvas_size = (40, 50)
+        win.has_mixed_sizes = False
+        win.textures = ["texture"]
+        win.thumb_pics = [MagicMock()]
+        win.picture = MagicMock()
+        win.align_box = MagicMock()
+        win.crop_manager = MagicMock()
+        win.has_unsaved_changes = True
+        win._build_textures = MagicMock()
+        win._update_save_button = MagicMock()
+        win._update_reset_button = MagicMock()
+        win._update_frame = MagicMock()
+
+        ImagePreviewWindow._reset_current_view(win)
+
+        win.crop_manager.reset.assert_called_once()
+        self.assertEqual(win.original_pixbufs, ["restored-pixbuf"])
+        self.assertEqual(win.original_pil_images, ["restored-image"])
+        self.assertEqual(win.original_dimensions, [(100, 120)])
+        self.assertEqual(win.frame_palettes, [[(1, 2, 3, 4)]])
+        self.assertEqual(win.canvas_size, (100, 120))
+        self.assertTrue(win.has_mixed_sizes)
+        self.assertFalse(win.has_unsaved_changes)
+        win._build_textures.assert_called_once_with(4)
+        win.picture.set_paintable.assert_called_once_with("texture")
+        win.thumb_pics[0].set_paintable.assert_called_once_with("texture")
+        win.align_box.set_visible.assert_called_once_with(False)
+        win._update_save_button.assert_called_once()
+        win._update_reset_button.assert_called_once()
+        win._update_frame.assert_called_once()
+
+    def test_reload_current_files_uses_current_selection(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.file_paths = ["/mock/dir/frame_01.png", "/mock/dir/frame_02.png"]
+        win.current_frame = 1
+        win._load_sequence = MagicMock()
+
+        ImagePreviewWindow._reload_current_files(win)
+
+        win._load_sequence.assert_called_once_with(
+            ["/mock/dir/frame_01.png", "/mock/dir/frame_02.png"],
+            "/mock/dir/frame_02.png"
+        )
+
 if __name__ == "__main__":
     unittest.main()
