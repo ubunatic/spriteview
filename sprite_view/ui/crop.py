@@ -59,25 +59,45 @@ class CropManager:
         win = self.win
         if not win.textures or win.current_frame >= len(win.textures):
             return None
-            
-        tex = win.textures[win.current_frame]
-        tex_w = tex.get_width()
-        tex_h = tex.get_height()
-        
+
         if widget_w is None:
             widget_w = self.crop_overlay.get_width()
         if widget_h is None:
             widget_h = self.crop_overlay.get_height()
-            
-        if widget_w <= 0 or widget_h <= 0:
+
+        pic_w = win.picture.get_width()
+        pic_h = win.picture.get_height()
+        if pic_w <= 0 or pic_h <= 0:
             return None
-            
-        s = min(widget_w / tex_w, widget_h / tex_h)
-        img_w = tex_w * s
-        img_h = tex_h * s
-        x_offset = (widget_w - img_w) / 2
-        y_offset = (widget_h - img_h) / 2
-        
+
+        # Picture position within the outer_overlay (where crop_overlay sits)
+        if pic_w <= widget_w:
+            pic_x = (widget_w - pic_w) / 2
+        else:
+            hadj = win.scroll_zoom.get_hadjustment()
+            pic_x = -(hadj.get_value() if hadj else 0)
+        if pic_h <= widget_h:
+            pic_y = (widget_h - pic_h) / 2
+        else:
+            vadj = win.scroll_zoom.get_vadjustment()
+            pic_y = -(vadj.get_value() if vadj else 0)
+
+        if win._zoom == 0:
+            tex = win.textures[win.current_frame]
+            tex_w = tex.get_width()
+            tex_h = tex.get_height()
+            s = min(pic_w / tex_w, pic_h / tex_h) if pic_w > 0 else 1
+            img_w = tex_w * s
+            img_h = tex_h * s
+            x_offset = pic_x + (pic_w - img_w) / 2
+            y_offset = pic_y + (pic_h - img_h) / 2
+        else:
+            s = 1.0
+            img_w = pic_w
+            img_h = pic_h
+            x_offset = pic_x
+            y_offset = pic_y
+
         return {
             'x_min': x_offset,
             'x_max': x_offset + img_w,

@@ -218,6 +218,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.original_pil_images: List[Image.Image] = []
         self.frame_palettes = []
         self.swatch_colors = [(0, 0, 0, 255)] * 16
+        self.palette_sort_key = "index"
         self.selected_color = (0, 0, 0, 255)
         self.current_align = 4  # center
         self.align_btns: List[Gtk.Button] = []
@@ -263,27 +264,32 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         # Build main picture widget
         self.picture = Gtk.Picture()
         self.picture.props.content_fit = Gtk.ContentFit.CONTAIN
-        self.picture.set_vexpand(True)
-        self.picture.set_hexpand(True)
         self._bg_css = Gtk.CssProvider()
         self.picture.get_style_context().add_provider(self._bg_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self._apply_image_bg_color(self.settings.get("image_bg_color", "none"))
+
+        # Wrap picture in a ScrolledWindow for scroll support when zoomed in
+        self.scroll_zoom = Gtk.ScrolledWindow()
+        self.scroll_zoom.set_vexpand(True)
+        self.scroll_zoom.set_hexpand(True)
+        self.scroll_zoom.set_child(self.picture)
+
         scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
         scroll.connect("scroll", self._on_scroll)
-        self.picture.add_controller(scroll)
+        self.scroll_zoom.add_controller(scroll)
 
-        # Wrap picture in an Overlay for the crop drawing area and crop button
-        overlay = Gtk.Overlay()
-        overlay.set_vexpand(True)
-        overlay.set_hexpand(True)
-        overlay.set_child(self.picture)
+        # Outer overlay for border drawing and crop manager
+        self.outer_overlay = Gtk.Overlay()
+        self.outer_overlay.set_vexpand(True)
+        self.outer_overlay.set_hexpand(True)
+        self.outer_overlay.set_child(self.scroll_zoom)
 
         # Overlay that draws a dotted border around the image bounds
         self.border_overlay = Gtk.DrawingArea()
         self.border_overlay.set_vexpand(True)
         self.border_overlay.set_hexpand(True)
         self.border_overlay.set_draw_func(self._draw_image_border)
-        overlay.add_overlay(self.border_overlay)
+        self.outer_overlay.add_overlay(self.border_overlay)
 
         self.picture.connect("notify::paintable", self._on_picture_paintable_changed)
         self._apply_image_border_visibility(self.settings.get("show_image_border", False))
@@ -291,14 +297,14 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         # Initialize modular CropManager
         from sprite_view.ui.crop import CropManager
         self.crop_manager = CropManager(self)
-        overlay.add_overlay(self.crop_manager.crop_overlay)
-        overlay.add_overlay(self.crop_manager.btn_overlay_crop)
+        self.outer_overlay.add_overlay(self.crop_manager.crop_overlay)
+        self.outer_overlay.add_overlay(self.crop_manager.btn_overlay_crop)
 
         picture_click = Gtk.GestureClick()
         picture_click.connect("pressed", self._on_picture_clicked)
         self.crop_manager.crop_overlay.add_controller(picture_click)
 
-        left_box.append(overlay)
+        left_box.append(self.outer_overlay)
 
         # Setup Sidebar properties (right pane)
         title_lbl = Gtk.Label()
@@ -333,10 +339,20 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.lbl_info_frame = create_sidebar_row("Frame")
 
         # Setup Color Palette sidebar section
+        palette_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         palette_lbl = Gtk.Label()
         palette_lbl.set_markup("<b>Color Palette</b>")
         palette_lbl.set_halign(Gtk.Align.START)
-        right_box.append(palette_lbl)
+        palette_lbl.set_hexpand(True)
+        palette_header.append(palette_lbl)
+
+        sort_dropdown = Gtk.DropDown.new_from_strings([
+            "Index", "Value", "Luminance", "Hue", "Saturation"
+        ])
+        sort_dropdown.set_selected(0)
+        sort_dropdown.connect("notify::selected", self._on_palette_sort_changed)
+        palette_header.append(sort_dropdown)
+        right_box.append(palette_header)
 
         sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         right_box.append(sep2)
@@ -533,39 +549,62 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
     def _apply_image_border_visibility(self, visible: bool) -> None:
         self.border_overlay.set_visible(visible)
 
+    def _get_picture_viewport_bounds(self):
+        """Return dict with picture's position and visible size within the outer overlay."""
+        pic_w = self.picture.get_width()
+        pic_h = self.picture.get_height()
+        outer_w = self.outer_overlay.get_width()
+        outer_h = self.outer_overlay.get_height()
+        hadj = self.scroll_zoom.get_hadjustment()
+        vadj = self.scroll_zoom.get_vadjustment()
+        if pic_w <= outer_w:
+            pic_x = (outer_w - pic_w) / 2
+        else:
+            pic_x = -(hadj.get_value() if hadj else 0)
+        if pic_h <= outer_h:
+            pic_y = (outer_h - pic_h) / 2
+        else:
+            pic_y = -(vadj.get_value() if vadj else 0)
+        vis_x = max(0, pic_x)
+        vis_y = max(0, pic_y)
+        vis_w = min(pic_w, outer_w - vis_x)
+        vis_h = min(pic_h, outer_h - vis_y)
+        return {
+            'pic_x': pic_x, 'pic_y': pic_y,
+            'pic_w': pic_w, 'pic_h': pic_h,
+            'vis_x': vis_x, 'vis_y': vis_y,
+            'vis_w': vis_w, 'vis_h': vis_h,
+            'outer_w': outer_w, 'outer_h': outer_h,
+        }
+
     def _draw_image_border(self, area, cr, width, height) -> None:
-        paintable = self.picture.get_paintable()
-        if not paintable:
+        if not self.picture.get_paintable():
             return
-        tex_w = paintable.get_intrinsic_width()
-        tex_h = paintable.get_intrinsic_height()
-        if tex_w <= 0 or tex_h <= 0:
+        b = self._get_picture_viewport_bounds()
+        if b['pic_w'] <= 0 or b['pic_h'] <= 0:
             return
-        scale = min(width / tex_w, height / tex_h)
-        draw_w = tex_w * scale
-        draw_h = tex_h * scale
-        draw_x = (width - draw_w) / 2
-        draw_y = (height - draw_h) / 2
         cr.set_source_rgba(0.75, 0.75, 0.75, 0.6)
         cr.set_line_width(1.0)
         cr.set_dash([2, 6], 0)
-        cr.rectangle(draw_x, draw_y, draw_w, draw_h)
+        cr.rectangle(b['vis_x'], b['vis_y'], b['vis_w'], b['vis_h'])
         cr.stroke()
 
     def _on_picture_paintable_changed(self, *args) -> None:
         self.border_overlay.queue_draw()
-        if self._zoom != 0 and not self._applying_zoom:
-            self._apply_zoom()
 
     def _on_scroll(self, controller, dx, dy) -> bool:
+        if self._zoom == 0:
+            w = self.picture.get_width()
+            h = self.picture.get_height()
+            src = self._source_pixbufs[self.current_frame]
+            sw, sh = src.get_width(), src.get_height()
+            effective = min(w / sw, h / sh) if w > 0 and h > 0 else 1.0
+            self._zoom = effective
         if dy < 0:
-            if self._zoom == 0:
-                self._zoom = 1.0
             self._zoom *= 1.25
         else:
-            if self._zoom == 0:
-                self._zoom = 1.0
             self._zoom /= 1.25
+        self._zoom = max(0.1, min(100.0, self._zoom))
         self._apply_zoom()
         return True
 
@@ -574,22 +613,40 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             return
         idx = self.current_frame
         pixbuf = self._source_pixbufs[idx]
+        pw, ph = pixbuf.get_width(), pixbuf.get_height()
         if self._zoom == 0:
             self._applying_zoom = True
             self.picture.set_paintable(self.textures[idx])
             self._applying_zoom = False
             self.picture.props.content_fit = Gtk.ContentFit.CONTAIN
+            self.picture.set_size_request(-1, -1)
+            self.picture.set_hexpand(True)
+            self.picture.set_vexpand(True)
+            self.picture.set_halign(Gtk.Align.FILL)
+            self.picture.set_valign(Gtk.Align.FILL)
             self._zoom_lbl.set_text("Auto")
+            print(f"ZOOM: auto src={pw}x{ph} tex={self.textures[idx].get_width()}x{self.textures[idx].get_height()}")
         else:
-            w = pixbuf.get_width()
-            h = pixbuf.get_height()
-            new_w = max(1, int(w * self._zoom))
-            new_h = max(1, int(h * self._zoom))
-            scaled = pixbuf.scale_simple(new_w, new_h, GdkPixbuf.InterpType.BILINEAR)
+            new_w = max(1, int(pw * self._zoom))
+            new_h = max(1, int(ph * self._zoom))
+            new_w = min(new_w, 8192)
+            new_h = min(new_h, 8192)
+            print(f"ZOOM: zoom={self._zoom:.3f} src={pw}x{ph} -> dst={new_w}x{new_h}")
+            scaled = pixbuf.scale_simple(new_w, new_h, GdkPixbuf.InterpType.NEAREST)
             texture = pixbuf_to_texture(scaled)
+            tw, th = texture.get_width(), texture.get_height()
+            assert tw == new_w, f"ZOOM FAIL: tex_w={tw} != new_w={new_w}"
+            assert th == new_h, f"ZOOM FAIL: tex_h={th} != new_h={new_h}"
             self._applying_zoom = True
             self.picture.set_paintable(texture)
             self._applying_zoom = False
+            self.picture.props.content_fit = Gtk.ContentFit.CONTAIN
+            self.picture.set_size_request(new_w, new_h)
+            self.picture.set_hexpand(False)
+            self.picture.set_vexpand(False)
+            self.picture.set_halign(Gtk.Align.CENTER)
+            self.picture.set_valign(Gtk.Align.CENTER)
+            print(f"ZOOM: OK tex={tw}x{th} req=({new_w},{new_h}) fit=CONTAIN expand=F halign=CENTER")
             if self._zoom == int(self._zoom):
                 self._zoom_lbl.set_text(f"{int(self._zoom)}:1")
             else:
@@ -693,7 +750,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             self._zoom = zoom_map[keyval]
             self._apply_zoom()
             return True
-                
+
         return False
 
     def _update_folder_navigation_sensitivity(self) -> None:
@@ -1104,11 +1161,16 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         draw_x = (w - draw_w) / 2
         draw_y = (h - draw_h) / 2
 
-        if x < draw_x or x >= draw_x + draw_w or y < draw_y or y >= draw_y + draw_h:
+        # x,y are in outer_overlay coords -> convert to picture coords
+        b = self._get_picture_viewport_bounds()
+        px_in_pic = x - b['pic_x']
+        py_in_pic = y - b['pic_y']
+
+        if px_in_pic < draw_x or px_in_pic >= draw_x + draw_w or py_in_pic < draw_y or py_in_pic >= draw_y + draw_h:
             return
 
-        tex_x = (x - draw_x) / scale
-        tex_y = (y - draw_y) / scale
+        tex_x = (px_in_pic - draw_x) / scale
+        tex_y = (py_in_pic - draw_y) / scale
 
         if self.has_mixed_sizes:
             canvas_w, canvas_h = self.canvas_size
@@ -1159,6 +1221,58 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             col = self.swatch_colors[best_idx]
             self.selected_color = col
             self._update_selected_color_ui()
+
+    def _on_palette_sort_changed(self, dropdown, pspec) -> None:
+        keys = ["index", "value", "luminance", "hue", "saturation"]
+        idx = dropdown.get_selected()
+        self.palette_sort_key = keys[idx]
+        self._apply_palette_sort()
+
+    def _palette_sort_key(self, col, key) -> tuple:
+        r, g, b, _ = col
+        if key == "value":
+            return (r << 16) | (g << 8) | b,
+        if key == "luminance":
+            return 0.299 * r + 0.587 * g + 0.114 * b,
+        if key == "hue":
+            rn, gn, bn = r / 255.0, g / 255.0, b / 255.0
+            mx = max(rn, gn, bn)
+            mn = min(rn, gn, bn)
+            if mx == mn:
+                return -1,
+            if mx == rn:
+                h = (60 * (gn - bn) / (mx - mn)) % 360
+            elif mx == gn:
+                h = 60 * (bn - rn) / (mx - mn) + 120
+            else:
+                h = 60 * (rn - gn) / (mx - mn) + 240
+            return h,
+        if key == "saturation":
+            mx = max(r, g, b)
+            mn = min(r, g, b)
+            if mx == 0:
+                return 0,
+            return (mx - mn) / mx,
+        return (),
+
+    def _apply_palette_sort(self) -> None:
+        key = self.palette_sort_key
+        palette = self.frame_palettes[self.current_frame]
+        if key == "index":
+            for i in range(16):
+                if i < len(palette):
+                    self.swatch_colors[i] = palette[i]
+                    self.swatch_widgets[i].queue_draw()
+            self.palette_flowbox.unselect_all()
+            return
+        visible = [(i, palette[i]) for i in range(min(len(palette), 16)) if self.swatch_widgets[i].get_visible()]
+        if not visible:
+            return
+        sorted_colors = [col for _, col in sorted(visible, key=lambda x: self._palette_sort_key(x[1], key))]
+        for i, col in enumerate(sorted_colors):
+            self.swatch_colors[i] = col
+            self.swatch_widgets[i].queue_draw()
+        self.palette_flowbox.unselect_all()
 
     def _update_play_pause_button(self) -> None:
         if self.is_playing:
@@ -1244,7 +1358,11 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             return
             
         self.picture.set_paintable(self.textures[self.current_frame])
-        
+
+        # Re-apply zoom if a manual zoom level is active
+        if self._zoom != 0:
+            self._apply_zoom()
+
         current_path = self.file_paths[self.current_frame]
         frame_file = os.path.basename(current_path)
         
@@ -1289,6 +1407,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             else:
                 swatch.set_visible(False)
 
+        self._apply_palette_sort()
         self.palette_flowbox.unselect_all()
 
         # Update active frame styling if in animation mode
@@ -1335,6 +1454,8 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.align_btns[align].add_css_class("align-active")
         self._build_textures(align)
         self.picture.set_paintable(self.textures[self.current_frame])
+        if self._zoom != 0:
+            self._apply_zoom()
         for i, thumb_pic in enumerate(self.thumb_pics):
             thumb_pic.set_paintable(self.textures[i])
 
@@ -1735,6 +1856,8 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
 
         if self.textures:
             self.picture.set_paintable(self.textures[self.current_frame])
+        if hasattr(self, '_zoom') and self._zoom != 0:
+            self._apply_zoom()
 
         for idx, texture in enumerate(self.textures):
             if idx < len(self.thumb_pics):
