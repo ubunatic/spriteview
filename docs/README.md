@@ -11,6 +11,7 @@ Welcome to the Sprite View developer and design documentation. These are "evergr
 | :--- | :--- |
 | **Feature & Architectural Docs** | |
 | [Interactive_Crop_And_Save.md](file:///home/uwe/projects/spriteview/docs/Interactive_Crop_And_Save.md) | Design and pitfalls of the CropManager, gesture handling, and Save split button. |
+| [GTK4.md](file:///home/uwe/projects/spriteview/docs/GTK4.md) | GTK4/PyGObject guidelines, event gesture consolidation, and uniqueness flags. |
 | [In_Place_Navigation_And_Application_Uniqueness.md](file:///home/uwe/projects/spriteview/docs/In_Place_Navigation_And_Application_Uniqueness.md) | Single-instance window reuse and Nautilus integration. |
 | [Focus_Management.md](file:///home/uwe/projects/spriteview/docs/Focus_Management.md) | GTK4 window presentation and focus management rules. |
 | [Window_Management.md](file:///home/uwe/projects/spriteview/docs/Window_Management.md) | GTK4 application windows construction and cleanup. |
