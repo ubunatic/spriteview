@@ -10,7 +10,4 @@ Adhere to the following conventions.
 - Make/Makefile @docs/Make.md,
   ⚙️ phony sentinel, self-doc help, build dependency pattern
 - GTK4 / GObject UI @docs/GTK4.md,
-  - Use NON_UNIQUE application flags to prevent background instances from swallowing CLI files.
-  - Run integration smoke tests (test_integration.py) to catch Gtk startup crashes/AttributeErrors.
-  - Prefer consolidating click and drag events into a single Gtk.GestureDrag controller instead of adding separate Gtk.GestureClick and Gtk.GestureDrag onto the same widget to prevent click release events from prematurely cancelling/resetting drag states.
 <!-- claudeconfig:end Language Conventions -->
