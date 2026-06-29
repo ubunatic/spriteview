@@ -242,6 +242,8 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self._mouse_y = 0.0
         self._zoom_center_px = None
         self._zoom_center_py = None
+        self._scroll_accumulator = 0.0
+        self._scroll_timeout_id = None
 
         # Root split-pane layout
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -665,6 +667,22 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             vadj.set_value(-desired_pic_y)
 
     def _on_scroll(self, controller, dx, dy) -> bool:
+        self._scroll_accumulator += dy
+        if self._scroll_timeout_id is None:
+            self._scroll_timeout_id = GLib.timeout_add(
+                80, self._flush_scroll
+            )
+        return True
+
+    def _flush_scroll(self) -> bool:
+        self._scroll_timeout_id = None
+        acc = int(self._scroll_accumulator)
+        self._scroll_accumulator = 0.0
+        if acc == 0:
+            return False
+        if self._applying_zoom:
+            return False
+
         levels = self._get_zoom_levels()
 
         if self._zoom == 0:
@@ -677,34 +695,33 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         else:
             current = self._zoom
 
-        src_x, src_y = self._get_source_pixel_at_screen(self._mouse_x, self._mouse_y)
-
         try:
             idx = levels.index(current)
         except ValueError:
             idx = min(range(len(levels)), key=lambda i: abs(levels[i] - current))
-        if dy < 0:
-            idx = min(idx + 1, len(levels) - 1)
-        else:
-            idx = max(idx - 1, 0)
-        self._zoom = levels[idx]
 
+        new_idx = max(0, min(idx - acc, len(levels) - 1))
+        if new_idx == idx:
+            return False
+
+        src_x, src_y = self._get_source_pixel_at_screen(self._mouse_x, self._mouse_y)
+
+        self._zoom = levels[new_idx]
         self._zoom_center_px = src_x
         self._zoom_center_py = src_y
         self._apply_zoom()
         self._adjust_scroll_for_zoom(src_x, src_y, self._mouse_x, self._mouse_y)
-        return True
+        return False
 
     def _apply_zoom(self) -> None:
         if not self._source_pixbufs or self.current_frame >= len(self._source_pixbufs):
             return
+        self._applying_zoom = True
         idx = self.current_frame
         pixbuf = self._source_pixbufs[idx]
         pw, ph = pixbuf.get_width(), pixbuf.get_height()
         if self._zoom == 0:
-            self._applying_zoom = True
             self.picture.set_paintable(self.textures[idx])
-            self._applying_zoom = False
             self.picture.props.content_fit = Gtk.ContentFit.CONTAIN
             self.picture.set_size_request(-1, -1)
             self.picture.set_hexpand(True)
@@ -725,20 +742,19 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             tw, th = texture.get_width(), texture.get_height()
             assert tw == new_w, f"ZOOM FAIL: tex_w={tw} != new_w={new_w}"
             assert th == new_h, f"ZOOM FAIL: tex_h={th} != new_h={new_h}"
-            self._applying_zoom = True
             self.picture.set_paintable(texture)
-            self._applying_zoom = False
             self.picture.props.content_fit = Gtk.ContentFit.CONTAIN
             self.picture.set_size_request(new_w, new_h)
             self.picture.set_hexpand(False)
             self.picture.set_vexpand(False)
             self.picture.set_halign(Gtk.Align.CENTER)
             self.picture.set_valign(Gtk.Align.CENTER)
-            print(f"ZOOM: OK tex={tw}x{th} req=({new_w},{new_h}) fit=CONTAIN expand=F halign=CENTER")
             if self._zoom == int(self._zoom):
                 self._zoom_lbl.set_text(f"{int(self._zoom)}:1")
             else:
                 self._zoom_lbl.set_text(f"{self._zoom:.2f}")
+
+        self._applying_zoom = False
 
     def _extract_palette_from_pixbuf(self, pixbuf: GdkPixbuf.Pixbuf, max_colors: int = 16) -> List[tuple]:
         w = pixbuf.get_width()
