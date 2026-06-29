@@ -76,6 +76,40 @@ class SettingsWindow(Gtk.Window):
         default_mode_row.append(self.default_mode_dropdown)
         box.append(default_mode_row)
 
+        sep_display = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        box.append(sep_display)
+
+        # 5. Display Settings
+        display_lbl = Gtk.Label(label="Display:")
+        display_lbl.set_halign(Gtk.Align.START)
+        box.append(display_lbl)
+
+        # 5a. Image background color row
+        bg_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.bg_check = Gtk.CheckButton(label="Custom background")
+        self.bg_check.set_active(self.settings.get("image_bg_color", "none") != "none")
+        self.bg_check.connect("toggled", self._on_bg_toggled)
+        bg_row.append(self.bg_check)
+        self.bg_color_btn = Gtk.ColorButton()
+        try:
+            rgba = Gdk.RGBA()
+            rgba.parse(self.settings.get("image_bg_color", "#3d3d3d"))
+        except Exception:
+            rgba = Gdk.RGBA(0.24, 0.24, 0.24, 1.0)
+        self.bg_color_btn.set_rgba(rgba)
+        self.bg_color_btn.set_sensitive(self.bg_check.get_active())
+        self.bg_color_btn.connect("notify::rgba", self._on_bg_color_changed)
+        bg_row.append(self.bg_color_btn)
+        box.append(bg_row)
+
+        # 5b. Image border toggle
+        border_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.border_check = Gtk.CheckButton(label="Show image border")
+        self.border_check.set_active(self.settings.get("show_image_border", False))
+        self.border_check.connect("toggled", self._on_border_toggled)
+        border_row.append(self.border_check)
+        box.append(border_row)
+
         sep_seps = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         box.append(sep_seps)
 
@@ -181,6 +215,36 @@ class SettingsWindow(Gtk.Window):
 
     def _on_default_mode_changed(self, dropdown, pspec) -> None:
         self.settings["default_mode"] = dropdown.get_selected()
+        save_settings(self.settings)
+
+    def _on_bg_toggled(self, check) -> None:
+        active = check.get_active()
+        self.bg_color_btn.set_sensitive(active)
+        if active:
+            rgba = self.bg_color_btn.get_rgba()
+            color = f"#{int(rgba.red * 255):02x}{int(rgba.green * 255):02x}{int(rgba.blue * 255):02x}"
+        else:
+            color = "none"
+        self.settings["image_bg_color"] = color
+        if hasattr(self.parent_win, "_apply_image_bg_color"):
+            self.parent_win._apply_image_bg_color(color)
+        save_settings(self.settings)
+
+    def _on_bg_color_changed(self, btn, pspec) -> None:
+        if not self.bg_check.get_active():
+            return
+        rgba = btn.get_rgba()
+        color = f"#{int(rgba.red * 255):02x}{int(rgba.green * 255):02x}{int(rgba.blue * 255):02x}"
+        self.settings["image_bg_color"] = color
+        if hasattr(self.parent_win, "_apply_image_bg_color"):
+            self.parent_win._apply_image_bg_color(color)
+        save_settings(self.settings)
+
+    def _on_border_toggled(self, check) -> None:
+        visible = check.get_active()
+        self.settings["show_image_border"] = visible
+        if hasattr(self.parent_win, "_apply_image_border_visibility"):
+            self.parent_win._apply_image_border_visibility(visible)
         save_settings(self.settings)
 
     def _rebuild_sep_chips(self) -> None:

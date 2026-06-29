@@ -18,7 +18,9 @@ def load_settings() -> dict:
             "{prefix}-{number}",
             "{prefix}{number}"
         ],
-        "saved_fps": {}
+        "saved_fps": {},
+        "image_bg_color": "none",
+        "show_image_border": True
     }
     try:
         if os.path.exists(CONFIG_PATH):
