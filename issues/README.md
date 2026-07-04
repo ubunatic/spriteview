@@ -11,3 +11,4 @@ This directory contains records of key issues, feature requests, and technical i
 | :--- | :--- | :--- | :--- |
 | [interactive_crop_feature.md](file:///home/uwe/projects/spriteview/issues/interactive_crop_feature.md) | **Closed** | Feature | Interactive cropping, snapped grid selection, and split save/save-as options. |
 | [advanced_export_options.md](file:///home/uwe/projects/spriteview/issues/advanced_export_options.md) | **Closed** | Feature | Palette optimization, ANSI mapping, and Nearest Neighbor export resizing. |
+| [website_zoom_picker_showcase.md](file:///home/uwe/projects/spriteview/issues/website_zoom_picker_showcase.md) | **Open** | Website | Showcase cursor-centered zoom and pixel color picker on the website; broken repo URLs fixed. |

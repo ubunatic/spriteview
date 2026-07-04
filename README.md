@@ -5,12 +5,16 @@
 A lightweight GTK4 image viewer for Linux — built for pixel artists and developers.
 Run it from the terminal, set it as your default image viewer, or use it directly inside GNOME Files.
 
+**Website:** <https://ubunatic.com/spriteview> · **Repo:** <https://codeberg.org/ubunatic/spriteview>
+
 <img src="website/assets/spriteview-screen-sheet-001.png" alt="SpriteView Animation Player" width="480">
 <img src="website/assets/spriteview-screen-color-info.png" alt="SpriteView Color Analyzer" width="480">
 
 ## Features
 
 - **Crisp scaling** — nearest-neighbor integer upscaling keeps pixel art sharp
+- **Cursor-centered zoom** — scroll to zoom towards the cursor, keyboard zoom towards the last zoom center
+- **Pixel color picker** — inspect individual pixel colors; configurable image background and border
 - **Sprite animation** — play/pause/step, 1–60 FPS spinbutton, loop/ping-pong/once modes
 - **Smart sequencing** — select one frame, SpriteView detects and loads the full sequence
 - **Multi-file** — pass multiple files or a folder directly from the CLI
@@ -24,7 +28,7 @@ Run it from the terminal, set it as your default image viewer, or use it directl
 ## Install
 
 ```bash
-curl -sSL https://codeberg.org/nautilus-spriteview/raw/branch/main/scripts/install.sh | bash
+curl -sSL https://codeberg.org/ubunatic/spriteview/raw/branch/main/scripts/install.sh | bash
 ```
 
 The script installs the `spriteview` CLI to `~/.local/bin/`, registers the `.desktop` entry
