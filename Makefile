@@ -14,8 +14,8 @@ SHARE := $(HOME)/.local/share/
 _sleep := s(){ for t in $$(seq $$1); do sleep 1; echo -n "."; done; echo; }; s
 
 help: ⚙️  ## show this help
-	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | \
-	awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*⚙.*#+' $(MAKEFILE_LIST) | \
+	awk 'BEGIN {FS = ":.*#+ "}; {printf "  %-10s %s\n", $$1, $$2}'
 
 open: ⚙️  ## open sprites dir using "open"
 	open sprites
