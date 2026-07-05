@@ -1,6 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Uwe Jugel
 # SPDX-License-Identifier: AGPL-3.0-or-later
-.PHONY: ⚙️  # make all targets phony
+.PHONY: ⚙️ 🤖  # ⚙️ = manual/once, 🤖 = managed
+_prim := \033[36m
+_rst  := \033[0m
+
 
 SHELL := bash
 EXTENSION_NAME := sprite_view.py
@@ -13,9 +16,9 @@ SHARE := $(HOME)/.local/share/
 
 _sleep := s(){ for t in $$(seq $$1); do sleep 1; echo -n "."; done; echo; }; s
 
-help: ⚙️  ## show this help
-	@grep -E '^[a-zA-Z_-]+:.*⚙.*#+' $(MAKEFILE_LIST) | \
-	awk 'BEGIN {FS = ":.*#+ "}; {printf "  %-10s %s\n", $$1, $$2}'
+help: 🤖  # show this help
+	@grep -E '^[a-zA-Z_-]+:.*[⚙🤖].*#+' $(MAKEFILE_LIST) | \
+	awk 'BEGIN {FS = ":.*#+ "}; {printf "    $(_prim)%-15s$(_rst) %s\n", $$1, $$2}'
 
 open: ⚙️  ## open sprites dir using "open"
 	open sprites
