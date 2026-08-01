@@ -50,6 +50,7 @@ pack: ⚙️  ## pack the app into a single self-contained file
 	python3 scripts/pack.py
 
 install: ⚙️ test pack  ## pack and install the extension and CLI, then restart Nautilus
+	@mkdir -p "$(SHARE)/nautilus-python/extensions"
 	@cp dist/$(EXTENSION_NAME) "$(SHARE)/nautilus-python/extensions/$(EXTENSION_NAME)"
 	@mkdir -p "$(HOME)/.local/bin"
 	@cp dist/$(EXTENSION_NAME) "$(HOME)/.local/bin/spriteview"
