@@ -1,9 +1,9 @@
 <!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-<!-- claudeconfig:begin Language Conventions -->
+<!-- harnez:begin Language Conventions -->
 Adhere to the following conventions.
 
-Docs in `./docs/` are managed by claudeconfig. <!-- claudeconfig:bundled -->
+Docs in `./docs/` are managed by harnez. <!-- harnez:bundled -->
 
 - Bash/Shell @docs/Bash.md,
   No ";", break before then/else/docs
@@ -19,4 +19,4 @@ Docs in `./docs/` are managed by claudeconfig. <!-- claudeconfig:bundled -->
   probe external mechanisms before building features on them
 - Spec system @docs/Spec.md,
   YAML spec files as single source of truth; Go code must not duplicate spec values
-<!-- claudeconfig:end Language Conventions -->
+<!-- harnez:end Language Conventions -->
