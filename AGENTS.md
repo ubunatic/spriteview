@@ -5,7 +5,10 @@ Adhere to the following conventions.
 
 Docs in `./docs/` are managed by harnez. <!-- harnez:bundled -->
 
+- GTK4/PyGObject @docs/GTK4.md,
+  GTK4 + PyGObject; prefer GObject signals over polling
 - Bash/Shell @docs/Bash.md,
+  Read before multi-line shell: Make recipes, embedded scripts
   No ";", break before then/else/docs
   No "if [[]]", No "if []", Use "if test"
   smart indent!
@@ -19,4 +22,8 @@ Docs in `./docs/` are managed by harnez. <!-- harnez:bundled -->
   probe external mechanisms before building features on them
 - Spec system @docs/Spec.md,
   YAML spec files as single source of truth; Go code must not duplicate spec values
+- Agentic Loop Practices @docs/AgenticLoop.md,
+  5-phase loop (Advisory -> Dev -> Review -> Hygiene -> Retro), zero zombie guarantee
+- Issue Tracking Practices @docs/IssueTracking.md,
+  P0-P3 priorities, metadata headers (Status, Priority, Severity, Category), tracker sync
 <!-- harnez:end Language Conventions -->
