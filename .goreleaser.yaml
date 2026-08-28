@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: 2026 Uwe Jugel
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+version: 2
+
+project_name: spriteview
+
+before:
+  hooks:
+    # GoReleaser empties dist/ for its own use, so the packed script can't
+    # live there — make pack writes dist/sprite_view.py (same file
+    # `make install` uses), then we stage a copy outside dist/.
+    - make pack
+    - mkdir -p .goreleaser-src
+    - cp dist/sprite_view.py .goreleaser-src/spriteview
+    - rm -rf dist
+
+# SpriteView has no Go/Zig/Rust code to compile — it ships as a single
+# self-contained Python script. GoReleaser's OSS edition has no "prebuilt
+# binary" builder (that's Pro-only), so there is nothing to put under
+# `builds:`. Instead we skip building entirely and use a "meta" archive,
+# which packs arbitrary files without requiring a build.
+builds:
+  - skip: true
+
+archives:
+  - id: default
+    meta: true
+    formats:
+      - tar.gz
+    name_template: "spriteview-{{ .Version }}"
+    files:
+      - src: .goreleaser-src/spriteview
+        dst: spriteview
+      - LICENSES/*
+      - README.md
+      - spriteview.desktop
+
+checksum:
+  name_template: 'SHA256SUMS'
+  algorithm: sha256
+
+signs:
+  - cmd: sh
+    args:
+      - -c
+      - >-
+        if test -n "${MINISIGN_PASSWORD}"
+        then echo "${MINISIGN_PASSWORD}" | minisign -S -s "${MINISIGN_KEY_FILE}" -m "${artifact}" -t "spriteview {{ .Version }}"
+        else minisign -S -s "${MINISIGN_KEY_FILE}" -m "${artifact}" -t "spriteview {{ .Version }}"
+        fi
+    artifacts: checksum
+    signature: "${artifact}.minisig"
+    env:
+      - MINISIGN_KEY_FILE
+      - MINISIGN_PASSWORD
+
+# Publishing is handled by fj (forgejo-cli) — run with --skip=publish.
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

@@ -3,6 +3,7 @@
 __pycache__/
 *.pyc
 dist/
+.goreleaser-src/
 .pytest_cache/
 .coverage
 
