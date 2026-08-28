@@ -115,7 +115,7 @@ then
       fi
    fi
 else printf 'Downloading %s from Codeberg...\n' "$extension_name" >&2
-     if curl -sSL -o "$user_ext_dir/$extension_name" "https://codeberg.org/nautilus-spriteview/raw/branch/main/sprite_view.py"
+     if curl -fsSL -o "$user_ext_dir/$extension_name" "https://codeberg.org/ubunatic/spriteview/raw/branch/main/sprite_view.py"
      then pass "Downloaded and installed $extension_name"
      else fail "Could not download $extension_name from Codeberg"
    fi
@@ -128,7 +128,7 @@ else printf 'Downloading %s from Codeberg...\n' "$extension_name" >&2
 fi
 
 # Copy Desktop Entry and Application Icon
-base_url="https://codeberg.org/nautilus-spriteview/raw/branch/main"
+base_url="https://codeberg.org/ubunatic/spriteview/raw/branch/main"
 desktop_file="${HOME}/.local/share/applications/com.ubunatic.spriteview.desktop"
 mkdir -p "${HOME}/.local/share/applications"
 install_desktop() {
@@ -137,7 +137,7 @@ install_desktop() {
 }
 if test -f "spriteview.desktop"
 then install_desktop "spriteview.desktop"
-elif curl -sSL -o "/tmp/com.ubunatic.spriteview.desktop" "${base_url}/spriteview.desktop"
+elif curl -fsSL -o "/tmp/com.ubunatic.spriteview.desktop" "${base_url}/spriteview.desktop"
 then install_desktop "/tmp/com.ubunatic.spriteview.desktop"
 else printf 'Warning: could not install desktop entry\n' >&2
 fi
@@ -145,7 +145,7 @@ fi
 icon_src="sprites/banner.png"
 if ! test -f "$icon_src"
 then icon_src="/tmp/com.ubunatic.spriteview.png"
-     if ! curl -sSL -o "$icon_src" "${base_url}/sprites/banner.png"
+     if ! curl -fsSL -o "$icon_src" "${base_url}/sprites/banner.png"
      then printf 'Warning: could not download app icon\n' >&2
           icon_src=""
      fi
