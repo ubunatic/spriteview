@@ -136,7 +136,10 @@ release-build: ⚙️  ## build release archives locally using GoReleaser
 release-snapshot: ⚙️  ## build local snapshot release artifacts (no tag, no publish, no sign)
 	goreleaser release --snapshot --clean --skip=sign,publish
 
-_dist_files = $(wildcard dist/*.tar.gz dist/SHA256SUMS dist/SHA256SUMS.minisig)
+# $(wildcard) caches dist/'s contents from before the release recipe runs
+# and misses files (like SHA256SUMS.minisig) created during that recipe;
+# $(shell ls) re-reads the directory fresh every time it is expanded.
+_dist_files = $(shell ls dist/*.tar.gz dist/SHA256SUMS dist/SHA256SUMS.minisig 2>/dev/null)
 
 _url_latest = https://codeberg.org/api/v1/repos/ubunatic/spriteview/releases/latest
 
