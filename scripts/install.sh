@@ -114,10 +114,27 @@ then
         else fail "Could not copy sprite_view package to $user_ext_dir/sprite_view"
       fi
    fi
-else printf 'Downloading %s from Codeberg...\n' "$extension_name" >&2
-     if curl -fsSL -o "$user_ext_dir/$extension_name" "https://codeberg.org/ubunatic/spriteview/raw/branch/main/sprite_view.py"
-     then pass "Downloaded and installed $extension_name"
-     else fail "Could not download $extension_name from Codeberg"
+else
+   # The raw sprite_view.py in the repo is unpacked: it imports from a
+   # sibling sprite_view/ package and has no shebang, so it cannot run
+   # standalone. Only the packed single-file script (built by
+   # scripts/pack.py, shipped inside each release tarball) is self-
+   # contained enough to drop directly into place. Fetch that instead.
+   printf 'Downloading packed %s from the latest Codeberg release...\n' "$extension_name" >&2
+   latest_tag=$(curl -fsSL "https://codeberg.org/api/v1/repos/ubunatic/spriteview/releases/latest" |
+                grep -o '"tag_name":"[^"]*"' | head -n1 | cut -d'"' -f4)
+   if test -z "$latest_tag"
+   then fail "Could not determine the latest Codeberg release"
+   fi
+   release_version="${latest_tag#v}"
+   tmp_dir=$(mktemp -d)
+   trap 'rm -rf "$tmp_dir"' EXIT
+   tarball_url="https://codeberg.org/ubunatic/spriteview/releases/download/${latest_tag}/spriteview-${release_version}.tar.gz"
+   if curl -fsSL -o "$tmp_dir/spriteview.tar.gz" "$tarball_url" &&
+      tar -xzf "$tmp_dir/spriteview.tar.gz" -C "$tmp_dir" spriteview
+   then cp "$tmp_dir/spriteview" "$user_ext_dir/$extension_name"
+        pass "Downloaded and installed $extension_name from $latest_tag"
+   else fail "Could not download $extension_name from Codeberg release $latest_tag ($tarball_url)"
    fi
    mkdir -p "${HOME}/.local/bin"
    if cp "$user_ext_dir/$extension_name" "${HOME}/.local/bin/spriteview"
