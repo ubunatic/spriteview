@@ -1084,6 +1084,9 @@
                 <a href="https://codeberg.org/ubunatic/spriteview" target="_blank" class="btn btn-secondary">
                     View Source Code
                 </a>
+                <a href="https://codeberg.org/ubunatic/spriteview/releases/latest" target="_blank" class="btn btn-secondary">
+                    Signed Releases
+                </a>
             </div>
         </div>
 
@@ -1504,6 +1507,15 @@
                                 </svg>
                             </button>
                         </div>
+                        <p style="font-size: 0.85rem; margin-top: 0.75rem; color: var(--text-muted);">
+                            Prefer not to pipe a script? Every release also ships as a
+                            <a href="https://codeberg.org/ubunatic/spriteview/releases/latest" target="_blank" rel="noopener">signed tarball</a>,
+                            checksummed in <code>SHA256SUMS</code> and signed with
+                            <a href="https://codeberg.org/ubunatic/spriteview/raw/branch/main/minisign.pub" target="_blank" rel="noopener">minisign</a>.
+                            Verify with <code>minisign -V -p minisign.pub -m SHA256SUMS</code>, then copy the extracted
+                            <code>spriteview</code> script to <code>~/.local/bin/</code> and
+                            <code>~/.local/share/nautilus-python/extensions/</code> yourself.
+                        </p>
                     </div>
                 </div>
 
