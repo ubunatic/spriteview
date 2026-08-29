@@ -21,3 +21,5 @@ Welcome to the Sprite View developer and design documentation. These are "evergr
 | [Bash.md](file:///home/uwe/projects/spriteview/docs/Bash.md) | Shell scripting standards and smart indents. |
 | [Packaging.md](file:///home/uwe/projects/spriteview/docs/Packaging.md) | Single-file script packaging workflow. |
 | [Web_Design.md](file:///home/uwe/projects/spriteview/docs/Web_Design.md) | Standardized web application styles and token guidelines. |
+| **Case Studies** | |
+| [2026-08-28-releasing-a-pure-python-project-with-goreleaser.md](file:///home/uwe/projects/spriteview/docs/studies/2026-08-28-releasing-a-pure-python-project-with-goreleaser.md) | Retrospective on standing up the GoReleaser/minisign release pipeline and the install.sh bugs it uncovered. |
