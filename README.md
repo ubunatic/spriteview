@@ -42,6 +42,16 @@ sudo dnf install nautilus-python    # Fedora / RHEL
 sudo pacman -S nautilus-python      # Arch / Manjaro
 ```
 
+**Pillow (PIL)** is required for interactive crop and some export paths —
+most GTK4 desktop environments already ship it, but if you hit an
+`ImportError: No module named PIL`, install it:
+
+```bash
+sudo apt install python3-pil        # Ubuntu / Debian / Linux Mint
+sudo dnf install python3-pillow     # Fedora / RHEL
+sudo pacman -S python-pillow        # Arch / Manjaro
+```
+
 ## Usage
 
 ```bash
