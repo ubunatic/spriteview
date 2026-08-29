@@ -40,22 +40,9 @@ checksum:
   name_template: 'SHA256SUMS'
   algorithm: sha256
 
-signs:
-  - cmd: sh
-    args:
-      - -c
-      - >-
-        if test -n "${MINISIGN_PASSWORD}"
-        then echo "${MINISIGN_PASSWORD}" | minisign -S -s "${MINISIGN_KEY_FILE}" -m "${artifact}" -t "spriteview {{ .Version }}"
-        else minisign -S -s "${MINISIGN_KEY_FILE}" -m "${artifact}" -t "spriteview {{ .Version }}"
-        fi
-    artifacts: checksum
-    signature: "${artifact}.minisig"
-    env:
-      - MINISIGN_KEY_FILE
-      - MINISIGN_PASSWORD
-
-# Publishing is handled by fj (forgejo-cli) — run with --skip=publish.
+# No `signs:` block: `harnez release` runs GoReleaser with
+# `--skip=publish --skip=sign` and signs dist/SHA256SUMS itself with
+# ~/.minisign/spriteview.key. Publishing is handled by fj (forgejo-cli).
 
 changelog:
   sort: asc
