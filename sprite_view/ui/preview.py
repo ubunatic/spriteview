@@ -251,6 +251,8 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self._zoom_center_py = None
         self._scroll_accumulator = 0.0
         self._scroll_timeout_id = None
+        self._space_down = False
+        self._pan_start = None
 
         # Root split-pane layout
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -324,6 +326,14 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         motion = Gtk.EventControllerMotion.new()
         motion.connect("motion", self._on_mouse_motion)
         self.outer_overlay.add_controller(motion)
+
+        pan_gesture = Gtk.GestureDrag.new()
+        pan_gesture.set_button(0)
+        pan_gesture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        pan_gesture.connect("drag-begin", self._on_pan_drag_begin)
+        pan_gesture.connect("drag-update", self._on_pan_drag_update)
+        pan_gesture.connect("drag-end", self._on_pan_drag_end)
+        self.outer_overlay.add_controller(pan_gesture)
 
         left_box.append(self.outer_overlay)
 
@@ -480,8 +490,11 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
 
         # Close window when ESC key is pressed or close requested
         key_controller = Gtk.EventControllerKey()
+        key_controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         key_controller.connect("key-pressed", self._on_key_pressed)
+        key_controller.connect("key-released", self._on_key_released)
         self.add_controller(key_controller)
+        self.connect("notify::is-active", self._on_window_active_changed)
         self.connect("close-request", self._on_close_request)
 
         # Setup indicator row (centered on its own row below picture)
@@ -642,6 +655,11 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             if z > max_zoom:
                 break
             levels.append(float(z))
+            if z < 4:
+                levels.extend(
+                    value for value in (z + step / 4 for step in (1, 2, 3))
+                    if value <= max_zoom
+                )
         z = 10
         while z <= max_zoom:
             levels.append(float(z))
@@ -651,6 +669,35 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
     def _on_mouse_motion(self, controller, x, y) -> None:
         self._mouse_x = x
         self._mouse_y = y
+
+    def _on_pan_drag_begin(self, gesture, start_x, start_y) -> None:
+        button = gesture.get_current_button()
+        if button not in (2, 3) and not (button == 1 and self._space_down):
+            # DENIED leaves propagation unstopped so the crop gesture can handle left drags.
+            gesture.set_state(Gtk.EventSequenceState.DENIED)
+            return
+        hadj = self.scroll_zoom.get_hadjustment()
+        vadj = self.scroll_zoom.get_vadjustment()
+        self._pan_start = (
+            button,
+            hadj.get_value() if hadj else 0.0,
+            vadj.get_value() if vadj else 0.0,
+        )
+        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+
+    def _on_pan_drag_update(self, gesture, offset_x, offset_y) -> None:
+        if self._pan_start is None:
+            return
+        _, start_x, start_y = self._pan_start
+        hadj = self.scroll_zoom.get_hadjustment()
+        vadj = self.scroll_zoom.get_vadjustment()
+        if hadj:
+            hadj.set_value(start_x - offset_x)
+        if vadj:
+            vadj.set_value(start_y - offset_y)
+
+    def _on_pan_drag_end(self, gesture, offset_x, offset_y) -> None:
+        self._pan_start = None
 
     def _get_source_pixel_at_screen(self, sx, sy):
         """Convert screen coordinates to source image pixel coordinates."""
@@ -821,6 +868,9 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         return True
 
     def _on_key_pressed(self, controller, keyval, keycode, state) -> bool:
+        if keyval in (Gdk.KEY_space, Gdk.KEY_KP_Space):
+            self._space_down = True
+            return True
         if keyval == Gdk.KEY_Escape:
             if hasattr(self, 'crop_manager') and self.crop_manager.crop_active:
                 self.crop_manager.reset()
@@ -890,6 +940,14 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             return True
 
         return False
+
+    def _on_key_released(self, controller, keyval, keycode, state) -> None:
+        if keyval in (Gdk.KEY_space, Gdk.KEY_KP_Space):
+            self._space_down = False
+
+    def _on_window_active_changed(self, window, pspec) -> None:
+        if not self.get_property("is-active"):
+            self._space_down = False
 
     def _update_folder_navigation_sensitivity(self) -> None:
         if not self.dir_path or not os.path.exists(self.dir_path):

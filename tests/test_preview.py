@@ -46,6 +46,83 @@ class TestImagePreviewWindow(unittest.TestCase):
 
         win.sidebar_box.set_visible.assert_has_calls([call(False), call(True)])
 
+    def test_zoom_levels_include_intermediate_steps(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        source = MagicMock()
+        source.get_width.return_value = 100
+        source.get_height.return_value = 100
+        win._source_pixbufs = [source]
+        win.current_frame = 0
+        win.settings = {"max_zoom_dim": 400}
+
+        levels = ImagePreviewWindow._get_zoom_levels(win)
+
+        self.assertIn(1.25, levels)
+        self.assertIn(1.5, levels)
+        self.assertIn(1.75, levels)
+        self.assertIn(2.25, levels)
+        self.assertEqual(levels, sorted(set(levels)))
+
+        win.settings = {"max_zoom_dim": 110}
+        capped_levels = ImagePreviewWindow._get_zoom_levels(win)
+        self.assertEqual(capped_levels[-1], 1.0)
+        self.assertLessEqual(capped_levels[-1], 1.1)
+
+    def test_pan_begin_accepts_middle_right_and_space_left_only(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.scroll_zoom = MagicMock()
+        win.scroll_zoom.get_hadjustment.return_value.get_value.return_value = 10
+        win.scroll_zoom.get_vadjustment.return_value.get_value.return_value = 20
+        win._space_down = False
+
+        for button in (2, 3):
+            gesture = MagicMock()
+            gesture.get_current_button.return_value = button
+            ImagePreviewWindow._on_pan_drag_begin(win, gesture, 0, 0)
+            gesture.set_state.assert_called_with(Gtk.EventSequenceState.CLAIMED)
+            ImagePreviewWindow._on_pan_drag_end(win, gesture, 0, 0)
+
+        gesture = MagicMock()
+        gesture.get_current_button.return_value = 1
+        ImagePreviewWindow._on_pan_drag_begin(win, gesture, 0, 0)
+        gesture.set_state.assert_called_once_with(Gtk.EventSequenceState.DENIED)
+
+        win._space_down = True
+        gesture = MagicMock()
+        gesture.get_current_button.return_value = 1
+        ImagePreviewWindow._on_pan_drag_begin(win, gesture, 0, 0)
+        gesture.set_state.assert_called_once_with(Gtk.EventSequenceState.CLAIMED)
+
+    def test_pan_drag_moves_scroll_adjustments(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win._pan_start = (2, 100, 200)
+        win.scroll_zoom = MagicMock()
+        hadj = MagicMock()
+        vadj = MagicMock()
+        win.scroll_zoom.get_hadjustment.return_value = hadj
+        win.scroll_zoom.get_vadjustment.return_value = vadj
+
+        ImagePreviewWindow._on_pan_drag_update(win, None, 15, -25)
+
+        hadj.set_value.assert_called_once_with(85)
+        vadj.set_value.assert_called_once_with(225)
+
+    def test_space_key_enables_and_releases_space_pan_mode(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win._space_down = False
+
+        handled = ImagePreviewWindow._on_key_pressed(win, None, Gdk.KEY_space, None, 0)
+        self.assertTrue(handled)
+        self.assertTrue(win._space_down)
+
+        ImagePreviewWindow._on_key_released(win, None, Gdk.KEY_space, None, 0)
+        self.assertFalse(win._space_down)
+
+        win.get_property.return_value = False
+        win._space_down = True
+        ImagePreviewWindow._on_window_active_changed(win, None, None)
+        self.assertFalse(win._space_down)
+
     def test_on_key_pressed_navigation(self):
         # Create a mock window instance
         win = MagicMock(spec=ImagePreviewWindow)
