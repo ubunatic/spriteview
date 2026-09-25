@@ -3,7 +3,7 @@
 
 # 003 — Left-button click selects pixels and drag starts crop
 
-**Status**: Open
+**Status**: Closed — resolved in 53d81b3
 **Priority**: P2 (Medium)
 **Severity**: Moderate
 **Category**: Feature
