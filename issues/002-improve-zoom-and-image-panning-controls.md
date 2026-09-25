@@ -3,11 +3,11 @@
 
 # 002 — Improve zoom and image panning controls
 
-**Status**: Open
+**Status**: Closed — resolved in 4e065bd
 **Priority**: P2 (Medium)
 **Severity**: Moderate
 **Category**: Feature
-**Related**: [Interactive crop feature](interactive_crop_feature.md)
+**Related**: [Interactive crop feature](interactive_crop_feature.md), implementation commit `4e065bd`
 
 ---
 
@@ -19,11 +19,11 @@ Current zoom steps feel too large, making it difficult to choose a useful interm
 
 - Add finer zoom increments while keeping zoom centered around the pointer where applicable.
 - Support space + pointer drag to pan the image.
-- Add a conventional mouse-button drag gesture for panning that also works with a pen/stylus.
-- The mouse gesture needs a design decision: middle-click drag is a candidate; right-click drag is another. Keep left-click available for the existing or future crop interaction. Do not assume a final button mapping without checking GTK/platform conventions and crop behavior.
+- Support middle-button drag and right-button drag for panning. Middle drag is the conventional canvas-pan gesture in image editors; right drag is included for stylus barrel buttons that commonly map to secondary click. Left drag remains available to crop mode.
+- The pan gesture is filtered by button and space-key state, so ordinary left clicks and crop drags are not claimed by panning.
 
 ## 3. Implementation & Verification Plan
 
 **Goal**: Let users make small zoom adjustments and pan the image with keyboard-modified or direct pointer gestures, including a pen/stylus.
 
-Verify smooth zoom increments and reliable panning without breaking existing image interactions, including cropping. Record the selected mouse-button mapping and its rationale.
+Verify finer zoom increments and reliable panning without breaking existing image interactions, including cropping. The selected gestures are space + left drag, middle drag, and right drag.
