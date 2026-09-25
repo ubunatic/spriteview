@@ -3,11 +3,11 @@
 
 # 001 — Hide side panel for standalone PNGs
 
-**Status**: Open
+**Status**: Closed — resolved in 1475fef
 **Priority**: P2 (Medium)
 **Severity**: Minor
 **Category**: Feature
-**Related**: —
+**Related**: `1475fef` — implementation
 
 ---
 
