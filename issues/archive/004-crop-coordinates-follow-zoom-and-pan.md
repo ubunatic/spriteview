@@ -3,7 +3,7 @@
 
 # 004 — Crop coordinates follow zoom and pan
 
-**Status**: Open
+**Status**: Closed — resolved
 **Priority**: P1 (High)
 **Severity**: Major
 **Category**: Bug
