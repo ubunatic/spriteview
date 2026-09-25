@@ -16,6 +16,7 @@ class CropManager:
         self.drag_in_progress = False
         self.crop_box = None
         self.crop_drag_start = (0.0, 0.0)
+        self.click_outside_crop = False
         
         # Create Drawing Area
         self.crop_overlay = Gtk.DrawingArea()
@@ -93,7 +94,10 @@ class CropManager:
             x_offset = pic_x + (pic_w - img_w) / 2
             y_offset = pic_y + (pic_h - img_h) / 2
         else:
-            s = 1.0
+            # In manual zoom mode the picture is sized in source pixels times
+            # the selected zoom. Crop coordinates stay in source pixels, so
+            # pointer deltas must be divided by that same scale.
+            s = win._zoom
             img_w = pic_w
             img_h = pic_h
             x_offset = pic_x
@@ -145,6 +149,7 @@ class CropManager:
         self.drag_start_widget = (start_x, start_y)
         self.previous_crop_active = self.crop_active
         self.previous_crop_box = self.crop_box
+        self.click_outside_crop = False
         
         # Ignore gestures outside the image; image clicks still select pixels.
         if start_x < bounds['x_min'] or start_x > bounds['x_max'] or start_y < bounds['y_min'] or start_y > bounds['y_max']:
@@ -162,12 +167,16 @@ class CropManager:
         canvas_w, canvas_h = win.canvas_size
         cx = max(0, min(canvas_w, cx))
         cy = max(0, min(canvas_h, cy))
+
+        if self.crop_active and self.crop_box:
+            x1, y1, x2, y2 = self._get_crop_box_widget_coords(bounds)
+            self.click_outside_crop = not (x1 <= start_x <= x2 and y1 <= start_y <= y2)
         
         self.drag_handle = None
         self.move_mode = False
         
         # Check if clicking on/near a handle first
-        if self.crop_active and self.crop_box:
+        if self.crop_active and self.crop_box and not self.click_outside_crop:
             cx1, cy1, cx2, cy2 = self._get_crop_box_widget_coords(bounds)
             handles = {
                 'TL': (cx1, cy1),
@@ -193,7 +202,7 @@ class CropManager:
                 self.initial_crop_box = self.crop_box
                 
         # If not clicking a handle, check if clicking inside the box
-        if not self.drag_handle and self.crop_active and self.crop_box:
+        if not self.drag_handle and not self.click_outside_crop and self.crop_active and self.crop_box:
             bx1, by1, bx2, by2 = self.crop_box
             if bx1 <= cx <= bx2 and by1 <= cy <= by2:
                 self.move_mode = True
@@ -201,12 +210,12 @@ class CropManager:
                 
         # If neither, start drawing a new crop box
         if not self.drag_handle and not self.move_mode:
-            self.crop_active = True
+            self.pending_new_crop = True
             self.crop_drag_start = (cx, cy)
-            self.crop_box = (cx, cy, cx, cy)
-            
+        else:
+            self.pending_new_crop = False
+
         self.crop_overlay.queue_draw()
-        self._update_crop_button_visibility()
 
     def _on_drag_update(self, gesture, offset_x, offset_y) -> None:
         if not hasattr(self, 'drag_in_progress') or not self.drag_in_progress:
@@ -220,6 +229,17 @@ class CropManager:
         # Map offset to canvas space and snap to source pixels
         offset_cx = int(round((offset_x / bounds['scale']) / win.scale_factor))
         offset_cy = int(round((offset_y / bounds['scale']) / win.scale_factor))
+
+        # A GestureDrag starts on mouse-down. Wait for a real drag before
+        # showing crop UI, so a click used to sample a color never flashes it.
+        if getattr(self, 'pending_new_crop', False):
+            if abs(offset_x) < 5.0 and abs(offset_y) < 5.0:
+                return
+            self.crop_active = True
+            start_cx, start_cy = self.crop_drag_start
+            self.crop_box = (start_cx, start_cy, start_cx, start_cy)
+            self.pending_new_crop = False
+            self._update_crop_button_visibility()
         
         canvas_w, canvas_h = win.canvas_size
         
@@ -280,10 +300,14 @@ class CropManager:
             
         # Check if the drag offset is small (indicating a simple click)
         is_click = abs(offset_x) < 5.0 and abs(offset_y) < 5.0
+        self.pending_new_crop = False
         
         if is_click:
-            self.crop_active = self.previous_crop_active
-            self.crop_box = self.previous_crop_box
+            if self.click_outside_crop:
+                self.reset()
+            else:
+                self.crop_active = self.previous_crop_active
+                self.crop_box = self.previous_crop_box
             start_x, start_y = self.drag_start_widget
             self.win._on_picture_clicked(gesture, 1, start_x, start_y)
         else:
@@ -296,6 +320,7 @@ class CropManager:
                         
         self.drag_handle = None
         self.move_mode = False
+        self.click_outside_crop = False
         self.crop_overlay.queue_draw()
         self._update_crop_button_visibility()
 
