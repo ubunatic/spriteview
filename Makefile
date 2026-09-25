@@ -49,7 +49,11 @@ test: ⚙️  ## run syntax check and unit tests
 pack: ⚙️  ## pack the app into a single self-contained file
 	python3 scripts/pack.py
 
-install: ⚙️ test pack  ## pack and install the extension and CLI, then restart Nautilus
+install: ⚙️  ## silently pack and install the extension and CLI, then restart Nautilus
+	@echo "Silent install, run 'make full-install' to see full log"
+	$(MAKE) full-install 2>/dev/null >/dev/null
+
+full-install: ⚙️ test pack  ## pack and install the extension and CLI, then restart Nautilus
 	@mkdir -p "$(SHARE)/nautilus-python/extensions"
 	@cp dist/$(EXTENSION_NAME) "$(SHARE)/nautilus-python/extensions/$(EXTENSION_NAME)"
 	@mkdir -p "$(HOME)/.local/bin"
