@@ -2,12 +2,50 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 import os
 from gi.repository import Gdk, Gtk, Gio, GdkPixbuf, GLib
 from sprite_view.ui.preview import ImagePreviewWindow
 
 class TestImagePreviewWindow(unittest.TestCase):
+    def test_standalone_png_hides_sidebar_by_default(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.btn_sidebar = MagicMock()
+        win.file_paths = ["/images/icon.png"]
+
+        ImagePreviewWindow._update_sidebar_visibility(win)
+
+        win.btn_sidebar.set_active.assert_called_once_with(False)
+
+    def test_detected_sequence_shows_sidebar(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.btn_sidebar = MagicMock()
+        win.file_paths = ["/images/walk_01.png", "/images/walk_02.png"]
+
+        ImagePreviewWindow._update_sidebar_visibility(win)
+
+        win.btn_sidebar.set_active.assert_called_once_with(True)
+
+    def test_other_standalone_image_keeps_sidebar_choice(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.btn_sidebar = MagicMock()
+        win.file_paths = ["/images/photo.jpg"]
+
+        ImagePreviewWindow._update_sidebar_visibility(win)
+
+        win.btn_sidebar.set_active.assert_not_called()
+
+    def test_sidebar_toggle_collapses_and_reopens_panel(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.sidebar_box = MagicMock()
+        button = MagicMock()
+        button.get_active.side_effect = [False, True]
+
+        ImagePreviewWindow._on_sidebar_toggled(win, button)
+        ImagePreviewWindow._on_sidebar_toggled(win, button)
+
+        win.sidebar_box.set_visible.assert_has_calls([call(False), call(True)])
+
     def test_on_key_pressed_navigation(self):
         # Create a mock window instance
         win = MagicMock(spec=ImagePreviewWindow)

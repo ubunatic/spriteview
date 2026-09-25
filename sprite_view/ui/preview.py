@@ -185,6 +185,13 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
 
         # Create hamburger menu button backed by Gio.Menu + PopoverMenu so that
         # items use the native 'menuitem' CSS node (correct weight and spacing).
+        self.btn_sidebar = Gtk.ToggleButton()
+        self.btn_sidebar.set_icon_name("view-sidebar-symbolic")
+        self.btn_sidebar.set_tooltip_text("Show or hide the sidebar")
+        self.btn_sidebar.set_active(True)
+        self.btn_sidebar.connect("toggled", self._on_sidebar_toggled)
+        header_bar.pack_end(self.btn_sidebar)
+
         self.menu_button = Gtk.MenuButton()
         self.menu_button.set_icon_name("open-menu-symbolic")
         header_bar.pack_end(self.menu_button)
@@ -265,6 +272,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         right_box.set_margin_top(12)
         right_box.set_margin_bottom(12)
         right_box.set_size_request(240, -1)
+        self.sidebar_box = right_box
         paned.set_end_child(right_box)
 
         # Build main picture widget
@@ -561,6 +569,22 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
 
     def _apply_image_border_visibility(self, visible: bool) -> None:
         self.border_overlay.set_visible(visible)
+
+    def _on_sidebar_toggled(self, button) -> None:
+        self.sidebar_box.set_visible(button.get_active())
+
+    def _update_sidebar_visibility(self) -> None:
+        """Hide standalone PNG sidebars while keeping sequence details visible."""
+        if not self.file_paths:
+            return
+
+        is_sequence = len(self.file_paths) > 1
+        is_standalone_png = (
+            len(self.file_paths) == 1
+            and self.file_paths[0].lower().endswith(".png")
+        )
+        if is_sequence or is_standalone_png:
+            self.btn_sidebar.set_active(is_sequence)
 
     def _get_picture_viewport_bounds(self):
         """Return dict with picture's position and visible size within the outer overlay."""
@@ -1087,6 +1111,7 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
 
         # Show/hide controls depending on sequence length
         is_anim = len(self.file_paths) > 1
+        self._update_sidebar_visibility()
         self.lbl_indicator.set_visible(is_anim)
         self.control_box.set_visible(is_anim)
         self.settings_box.set_visible(is_anim)
