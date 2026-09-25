@@ -312,10 +312,6 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self.outer_overlay.add_overlay(self.crop_manager.crop_overlay)
         self.outer_overlay.add_overlay(self.crop_manager.btn_overlay_crop)
 
-        picture_click = Gtk.GestureClick()
-        picture_click.connect("pressed", self._on_picture_clicked)
-        self.crop_manager.crop_overlay.add_controller(picture_click)
-
         scroll = Gtk.EventControllerScroll.new(
             Gtk.EventControllerScrollFlags.VERTICAL
         )
@@ -1320,9 +1316,6 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         self._select_palette_entry(color)
 
     def _on_picture_clicked(self, gesture, n_press, x, y) -> None:
-        if hasattr(self, 'crop_manager') and self.crop_manager.crop_active:
-            return
-
         if self.current_frame >= len(self.original_pixbufs):
             return
 

@@ -37,6 +37,7 @@ class CropManager:
         
         # Gestures
         drag_gesture = Gtk.GestureDrag.new()
+        drag_gesture.set_button(1)
         drag_gesture.connect("drag-begin", self._on_drag_begin)
         drag_gesture.connect("drag-update", self._on_drag_update)
         drag_gesture.connect("drag-end", self._on_drag_end)
@@ -135,21 +136,19 @@ class CropManager:
         return cx_min, cy_min, cx_max, cy_max
 
     def _on_drag_begin(self, gesture, start_x, start_y) -> None:
-        if not self.crop_active:
-            self.drag_in_progress = False
-            return
-            
         bounds = self._get_image_bounds()
         if not bounds:
             self.drag_in_progress = False
             return
             
         win = self.win
+        self.drag_start_widget = (start_x, start_y)
+        self.previous_crop_active = self.crop_active
+        self.previous_crop_box = self.crop_box
         
-        # Click outside the image bounds resets/hides crop helper
+        # Ignore gestures outside the image; image clicks still select pixels.
         if start_x < bounds['x_min'] or start_x > bounds['x_max'] or start_y < bounds['y_min'] or start_y > bounds['y_max']:
             self.drag_in_progress = False
-            self.reset()
             return
             
         self.drag_in_progress = True
@@ -269,6 +268,9 @@ class CropManager:
 
     def _on_drag_end(self, gesture, offset_x, offset_y) -> None:
         if not hasattr(self, 'drag_in_progress') or not self.drag_in_progress:
+            if hasattr(self, 'drag_start_widget'):
+                start_x, start_y = self.drag_start_widget
+                self.win._on_picture_clicked(gesture, 1, start_x, start_y)
             return
         self.drag_in_progress = False
         
@@ -280,13 +282,10 @@ class CropManager:
         is_click = abs(offset_x) < 5.0 and abs(offset_y) < 5.0
         
         if is_click:
-            # If they clicked/interacted with a handle or moved box, keep as is
-            if getattr(self, 'drag_handle', None):
-                self.crop_box = self.initial_crop_box
-            elif getattr(self, 'move_mode', False):
-                self.crop_box = self.initial_crop_box
-            else:
-                self.reset()
+            self.crop_active = self.previous_crop_active
+            self.crop_box = self.previous_crop_box
+            start_x, start_y = self.drag_start_widget
+            self.win._on_picture_clicked(gesture, 1, start_x, start_y)
         else:
             # If in draw mode (not drag_handle and not move_mode), check if too small
             if not getattr(self, 'drag_handle', None) and not getattr(self, 'move_mode', False):

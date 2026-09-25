@@ -287,6 +287,75 @@ class TestImagePreviewWindow(unittest.TestCase):
         cx1, cy1, cx2, cy2 = manager._get_crop_box_widget_coords(bounds)
         self.assertEqual((cx1, cy1, cx2, cy2), (130, 210, 250, 330))
 
+    def test_left_click_samples_pixel_without_creating_crop(self):
+        from sprite_view.ui.crop import CropManager
+        win = MagicMock(spec=ImagePreviewWindow)
+        manager = CropManager(win)
+        manager.drag_in_progress = True
+        manager.drag_start_widget = (12.0, 18.0)
+        manager.previous_crop_active = False
+        manager.previous_crop_box = None
+        manager.crop_active = True
+        manager.crop_box = (2, 3, 2, 3)
+
+        with patch.object(manager, "_get_image_bounds", return_value={"x_min": 0}):
+            manager._on_drag_end(None, 0.0, 0.0)
+
+        self.assertFalse(manager.crop_active)
+        self.assertIsNone(manager.crop_box)
+        win._on_picture_clicked.assert_called_once_with(None, 1, 12.0, 18.0)
+
+    def test_picture_click_selects_pixel_color(self):
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.current_frame = 0
+        pixbuf = MagicMock()
+        pixbuf.get_width.return_value = 2
+        pixbuf.get_height.return_value = 2
+        pixbuf.get_pixels.return_value = bytes((12, 34, 56, 255, 0, 0, 0, 255) * 2)
+        pixbuf.get_n_channels.return_value = 4
+        pixbuf.get_rowstride.return_value = 8
+        win.original_pixbufs = [pixbuf]
+        win.picture = MagicMock()
+        paintable = MagicMock()
+        paintable.get_intrinsic_width.return_value = 2
+        paintable.get_intrinsic_height.return_value = 2
+        win.picture.get_paintable.return_value = paintable
+        win.picture.get_width.return_value = 2
+        win.picture.get_height.return_value = 2
+        win.picture.get_allocation.return_value.width = 2
+        win.picture.get_allocation.return_value.height = 2
+        win._zoom = 0
+        win.scale_factor = 1
+        win.has_mixed_sizes = False
+        win._get_picture_viewport_bounds.return_value = {"pic_x": 0, "pic_y": 0}
+        win._update_selected_color_ui = MagicMock()
+        win._select_palette_entry = MagicMock()
+
+        ImagePreviewWindow._on_picture_clicked(win, None, 1, 0.5, 0.5)
+
+        self.assertEqual(win.selected_color, (12, 34, 56, 255))
+        win._select_palette_entry.assert_called_once_with((12, 34, 56, 255))
+
+    def test_left_drag_starts_crop_without_crop_mode_toggle(self):
+        from sprite_view.ui.crop import CropManager
+        win = MagicMock(spec=ImagePreviewWindow)
+        win.textures = [MagicMock()]
+        win.current_frame = 0
+        win.picture = MagicMock()
+        win._zoom = 1.0
+        win.scale_factor = 1
+        win.canvas_size = (100, 100)
+
+        manager = CropManager(win)
+        with patch.object(manager, "_get_image_bounds", return_value={
+            "x_min": 0, "x_max": 100, "y_min": 0, "y_max": 100, "scale": 1.0,
+        }):
+            manager._on_drag_begin(None, 10.0, 20.0)
+
+        self.assertTrue(manager.drag_in_progress)
+        self.assertTrue(manager.crop_active)
+        self.assertEqual(manager.crop_box, (10, 20, 10, 20))
+
     def test_crop_in_memory(self):
         from sprite_view.ui.crop import CropManager
         win = MagicMock(spec=ImagePreviewWindow)
