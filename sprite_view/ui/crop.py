@@ -89,15 +89,16 @@ class CropManager:
             tex_w = tex.get_width()
             tex_h = tex.get_height()
             s = min(pic_w / tex_w, pic_h / tex_h) if pic_w > 0 else 1
+            canvas_to_texture_scale = win.scale_factor
             img_w = tex_w * s
             img_h = tex_h * s
             x_offset = pic_x + (pic_w - img_w) / 2
             y_offset = pic_y + (pic_h - img_h) / 2
         else:
-            # In manual zoom mode the picture is sized in source pixels times
-            # the selected zoom. Crop coordinates stay in source pixels, so
-            # pointer deltas must be divided by that same scale.
+            # Manual zoom builds its paintable from the original source image,
+            # so source pixels map directly to the picture at the zoom scale.
             s = win._zoom
+            canvas_to_texture_scale = 1.0
             img_w = pic_w
             img_h = pic_h
             x_offset = pic_x
@@ -110,7 +111,8 @@ class CropManager:
             'y_max': y_offset + img_h,
             'w': img_w,
             'h': img_h,
-            'scale': s
+            'scale': s,
+            'canvas_to_texture_scale': canvas_to_texture_scale,
         }
 
     def _get_crop_box_widget_coords(self, bounds):
@@ -120,11 +122,12 @@ class CropManager:
         x1, y1, x2, y2 = self.crop_box
         win = self.win
         
-        # Map canvas -> texture
-        tx1 = x1 * win.scale_factor
-        ty1 = y1 * win.scale_factor
-        tx2 = x2 * win.scale_factor
-        ty2 = y2 * win.scale_factor
+        # Map source-canvas pixels into the texture used in the active zoom mode.
+        canvas_scale = bounds['canvas_to_texture_scale']
+        tx1 = x1 * canvas_scale
+        ty1 = y1 * canvas_scale
+        tx2 = x2 * canvas_scale
+        ty2 = y2 * canvas_scale
         
         # Map texture -> widget
         cx1 = bounds['x_min'] + tx1 * bounds['scale']
@@ -161,8 +164,9 @@ class CropManager:
         # Convert start coordinates to canvas space and snap to source pixels
         tx = (start_x - bounds['x_min']) / bounds['scale']
         ty = (start_y - bounds['y_min']) / bounds['scale']
-        cx = int(round(tx / win.scale_factor))
-        cy = int(round(ty / win.scale_factor))
+        canvas_scale = bounds['canvas_to_texture_scale']
+        cx = int(round(tx / canvas_scale))
+        cy = int(round(ty / canvas_scale))
         
         canvas_w, canvas_h = win.canvas_size
         cx = max(0, min(canvas_w, cx))
@@ -227,8 +231,9 @@ class CropManager:
             
         win = self.win
         # Map offset to canvas space and snap to source pixels
-        offset_cx = int(round((offset_x / bounds['scale']) / win.scale_factor))
-        offset_cy = int(round((offset_y / bounds['scale']) / win.scale_factor))
+        canvas_scale = bounds['canvas_to_texture_scale']
+        offset_cx = int(round((offset_x / bounds['scale']) / canvas_scale))
+        offset_cy = int(round((offset_y / bounds['scale']) / canvas_scale))
 
         # A GestureDrag starts on mouse-down. Wait for a real drag before
         # showing crop UI, so a click used to sample a color never flashes it.
@@ -412,10 +417,11 @@ class CropManager:
         tx2 = (cx2 - bounds['x_min']) / bounds['scale']
         ty2 = (cy2 - bounds['y_min']) / bounds['scale']
         
-        ox1 = tx1 / win.scale_factor
-        oy1 = ty1 / win.scale_factor
-        ox2 = tx2 / win.scale_factor
-        oy2 = ty2 / win.scale_factor
+        canvas_scale = bounds['canvas_to_texture_scale']
+        ox1 = tx1 / canvas_scale
+        oy1 = ty1 / canvas_scale
+        ox2 = tx2 / canvas_scale
+        oy2 = ty2 / canvas_scale
         
         crop_w = int(round(abs(ox2 - ox1)))
         crop_h = int(round(abs(oy2 - oy1)))

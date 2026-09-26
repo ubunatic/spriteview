@@ -282,7 +282,8 @@ class TestImagePreviewWindow(unittest.TestCase):
         bounds = {
             'x_min': 100,
             'y_min': 150,
-            'scale': 1.5
+            'scale': 1.5,
+            'canvas_to_texture_scale': 2,
         }
         cx1, cy1, cx2, cy2 = manager._get_crop_box_widget_coords(bounds)
         self.assertEqual((cx1, cy1, cx2, cy2), (130, 210, 250, 330))
@@ -298,26 +299,30 @@ class TestImagePreviewWindow(unittest.TestCase):
         win.picture.get_height.return_value = 400
         win.scroll_zoom.get_hadjustment.return_value.get_value.return_value = 80
         win.scroll_zoom.get_vadjustment.return_value.get_value.return_value = 30
-        win.scale_factor = 1
         win.canvas_size = (300, 200)
         manager = CropManager(win)
 
         get_bounds = manager._get_image_bounds
         with patch.object(manager, "_get_image_bounds",
                           side_effect=lambda *args: get_bounds(300, 200)):
-            for zoom, expected_scale in ((1.0, 1.0), (2.5, 2.5)):
-                with self.subTest(zoom=zoom):
-                    win._zoom = zoom
-                    bounds = manager._get_image_bounds()
-                    self.assertEqual(bounds['x_min'], -80)
-                    self.assertEqual(bounds['y_min'], -30)
-                    self.assertEqual(bounds['scale'], expected_scale)
+            for scale_factor in (1, 4):
+                win.scale_factor = scale_factor
+                for zoom, expected_scale in ((1.0, 1.0), (2.5, 2.5)):
+                    with self.subTest(scale_factor=scale_factor, zoom=zoom):
+                        win._zoom = zoom
+                        bounds = manager._get_image_bounds()
+                        self.assertEqual(bounds['x_min'], -80)
+                        self.assertEqual(bounds['y_min'], -30)
+                        self.assertEqual(bounds['scale'], expected_scale)
 
-                    manager._on_drag_begin(None, 20, 20)
-                    manager._on_drag_update(None, 25, 15)
-                    self.assertEqual(manager.crop_box, (100 // zoom, 50 // zoom,
-                                                        125 // zoom, 65 // zoom))
-                    manager.reset()
+                        manager._on_drag_begin(None, 20, 20)
+                        manager._on_drag_update(None, 25, 15)
+                        self.assertEqual(manager.crop_box, (100 // zoom, 50 // zoom,
+                                                            125 // zoom, 65 // zoom))
+                        widget_box = manager._get_crop_box_widget_coords(bounds)
+                        self.assertEqual(widget_box[2] - widget_box[0], 25)
+                        self.assertEqual(widget_box[3] - widget_box[1], 15)
+                        manager.reset()
 
     def test_left_click_samples_pixel_without_creating_crop(self):
         from sprite_view.ui.crop import CropManager
@@ -381,6 +386,7 @@ class TestImagePreviewWindow(unittest.TestCase):
         manager = CropManager(win)
         with patch.object(manager, "_get_image_bounds", return_value={
             "x_min": 0, "x_max": 100, "y_min": 0, "y_max": 100, "scale": 1.0,
+            "canvas_to_texture_scale": 1.0,
         }):
             manager._on_drag_begin(None, 10.0, 20.0)
             self.assertFalse(manager.crop_active)
@@ -406,6 +412,7 @@ class TestImagePreviewWindow(unittest.TestCase):
         manager.crop_box = (10, 10, 20, 20)
         bounds = {
             "x_min": 0, "x_max": 100, "y_min": 0, "y_max": 100, "scale": 1.0,
+            "canvas_to_texture_scale": 1.0,
         }
 
         with patch.object(manager, "_get_image_bounds", return_value=bounds):
