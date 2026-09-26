@@ -54,7 +54,7 @@ static review alone.
   unmodified against a Go-oriented tool.
 - **Isolated container validation caught two bugs that code review had
   already missed twice** (the org-name bug had reportedly been "fixed"
-  once before per `issues/website_zoom_picker_showcase.md`, in the website
+  once before per `issues/003-showcase-zoom-and-pixel-color-picker-on-the-website.md`, in the website
   copy only — it had silently regressed into `scripts/install.sh`).
   Running the actual documented one-liner against a clean podman container
   is what surfaced it, not re-reading the script.
@@ -133,7 +133,7 @@ static review alone.
     resolving the latest release via the Codeberg API and extracting the
     packed, self-contained `spriteview` script from the release tarball
     instead.
-  - `issues/website_zoom_picker_showcase.md` had already recorded the
+  - `issues/003-showcase-zoom-and-pixel-color-picker-on-the-website.md` had already recorded the
     org-name bug as fixed once — in the website copy only. It quietly
     regressed into `scripts/install.sh` and was not caught until this
     session. **That issue file still needs updating** to reflect the
@@ -247,7 +247,7 @@ Release artifacts published to Codeberg (`v0.1.0`, commit `3f882af`):
 `spriteview-0.1.0.tar.gz`, `SHA256SUMS`, `SHA256SUMS.minisig`.
 
 **Not yet done, carried forward:**
-- Update `issues/website_zoom_picker_showcase.md` to reflect that the
+- Update `issues/003-showcase-zoom-and-pixel-color-picker-on-the-website.md` to reflect that the
   org-name bug recurred in `scripts/install.sh` and was fixed in
   `7926509`/`f65542e`.
 - Decide on documenting/enforcing the undocumented Pillow dependency.

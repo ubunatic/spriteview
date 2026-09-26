@@ -64,5 +64,6 @@ The build, test, and packing steps are managed via the standard `Makefile`:
 
 - **`make test`**: Runs syntax verification (`py_compile`) on the entrypoint and executes the `unittest` suite inside `tests/`.
 - **`make pack`**: Compiles the source tree into `dist/sprite_view.py`.
-- **`make install`**: Automatically triggers `test` and `pack`, copies `dist/sprite_view.py` directly into the Nautilus-Python extensions directory, and restarts Nautilus to apply changes.
+- **`make install`**: Prints a brief status line, then runs `full-install` with its stdout and stderr redirected. It still runs `test` and `pack`, installs the extension and CLI, and restarts Nautilus.
+- **`make full-install`**: Runs the same install workflow with its full build, test, pack, and install log visible.
 - **`make uninstall`**: Removes the extension and cleans up caches.

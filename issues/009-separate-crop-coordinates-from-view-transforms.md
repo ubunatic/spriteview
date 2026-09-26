@@ -1,13 +1,13 @@
 <!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-# 005 — Separate crop coordinates from view transforms
+# 009 — Separate crop coordinates from view transforms
 
 **Status**: Open
 **Priority**: P2 (Medium)
 **Severity**: Moderate
 **Category**: Architecture
-**Related**: [004 — Crop coordinates follow zoom and pan](004-crop-coordinates-follow-zoom-and-pan.md), [Interactive crop feature](interactive_crop_feature.md)
+**Related**: [008 — Crop coordinates follow zoom and pan](008-crop-coordinates-follow-zoom-and-pan.md), [002 — Interactive crop and save feature](002-interactive-crop-and-save-feature.md)
 
 ---
 
@@ -41,4 +41,4 @@ Update crop pointer start/update, move/resize handles, overlay drawing, bounds, 
 
 Cover auto/fit view and manual zoom, fractional zoom, panning in both axes, display-texture upscaling, and zoom/pan after a selection. Verify source crop bounds and the resulting image dimensions and pixels, not just the visible rectangle. Add an interactive smoke check for selection, zooming into the selection, repositioning it, and committing the crop.
 
-Keep [issue 004](004-crop-coordinates-follow-zoom-and-pan.md) focused on the immediate manual-zoom correctness bug; close it only after its acceptance criteria pass. This issue covers the broader coordinate-model cleanup and separation of concerns.
+Keep [issue 008](008-crop-coordinates-follow-zoom-and-pan.md) focused on the immediate manual-zoom correctness bug; close it only after its acceptance criteria pass. This issue covers the broader coordinate-model cleanup and separation of concerns.

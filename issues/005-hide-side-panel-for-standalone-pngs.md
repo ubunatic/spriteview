@@ -1,7 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-# 001 — Hide side panel for standalone PNGs
+# 005 — Hide side panel for standalone PNGs
 
 **Status**: Closed — resolved in 1475fef
 **Priority**: P2 (Medium)

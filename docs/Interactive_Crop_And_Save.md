@@ -56,10 +56,15 @@ To ensure small pixel art sprites are crisp and readable, Sprite View upscales t
 - **Pitfall**: Failing to store the calculated scale factor back to the window state (`win.scale_factor`) causes the coordinate translation methods (mapping crop bounds from widget space to texture space to canvas space) to use the default scale factor `1`. This results in the visual crop helpers being rendered extremely small and shifted far to the top-left of the widget area.
 - **Solution**: Save the texture upscaling factor to `self.scale_factor` inside `_build_textures()` so all drawing and drag calculations scale correctly.
 
-### 2. Gesture Collisions (Clicks vs. Drags)
+### 2. Crop Coordinate Spaces at Manual Zoom
+- **Invariant**: A crop box is stored in source-canvas pixels. Auto zoom displays an upscaled texture, while manual zoom creates a new texture directly from the source pixbuf at `source_dimension * _zoom`.
+- **Pitfall**: The conversion cannot apply `scale_factor` uniformly in both modes. In manual zoom, source-to-widget scale is `_zoom`; texture-to-widget scale is `_zoom / scale_factor`. Applying `_zoom` after first multiplying crop coordinates by `scale_factor` enlarges and offsets the overlay, and dividing pointer deltas by both values records too-small source bounds.
+- **Verification status (2026-09-25)**: The regression test added in `1a1b756` verifies 1x and 2.5x manual zoom with horizontal and vertical pan only when `scale_factor = 1`. Issue 004 remains open until coverage and behavior for `scale_factor > 1`, plus any supported zoom change during an active drag, are verified.
+
+### 3. Gesture Collisions (Clicks vs. Drags)
 - **Pitfall**: Having a separate `Gtk.GestureClick` and `Gtk.GestureDrag` on the same drawing area creates collisions. A simple click fires `pressed` (from the click controller) followed immediately by `drag-begin` and `drag-end` (from the drag controller). The drag-end callback, seeing a tiny displacement (<2px), assumes the user wants to cancel the crop selection and triggers `reset()`, causing the crop box to flash and instantly disappear.
 - **Solution**: Consolidate all mouse/touch actions into a single `Gtk.GestureDrag`. Inside the `_on_drag_end` callback, detect a click by checking if the displacement is small (`abs(offset_x) < 5.0 and abs(offset_y) < 5.0`) and handle clicks/outside-clicks accordingly without gesture clashing.
 
-### 3. Coordinate Bounds Layout
+### 4. Coordinate Bounds Layout
 - **Pitfall**: When drawing overlay items (using Cairo on a `Gtk.DrawingArea` overlaid inside a `Gtk.Overlay`), the drawing area may not automatically align or size correctly.
 - **Solution**: Explicitly set alignment flags (`halign` and `valign` to `FILL`) on the drawing area widget, and pass down the allocated width and height (`w` and `h` arguments in GTK4 draw callback) to coordinate layout systems rather than querying `widget.get_width()` (which might return 0 during early layout cycles).

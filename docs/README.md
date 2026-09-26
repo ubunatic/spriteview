@@ -23,6 +23,14 @@ Welcome to the Sprite View developer and design documentation. These are "evergr
 | [Web_Design.md](file:///home/uwe/projects/spriteview/docs/Web_Design.md) | Standardized web application styles and token guidelines. |
 | **Release & Distribution** | |
 | [Release.md](file:///home/uwe/projects/spriteview/docs/Release.md) | Current release architecture: `harnez release`, `version.yaml`, minisign key, published assets. |
-| **Case Studies** | |
-| [2026-08-28-releasing-a-pure-python-project-with-goreleaser.md](file:///home/uwe/projects/spriteview/docs/studies/2026-08-28-releasing-a-pure-python-project-with-goreleaser.md) | Retrospective on standing up the GoReleaser/minisign release pipeline and the install.sh bugs it uncovered. |
-| [2026-08-29-migrating-to-harnez-release.md](file:///home/uwe/projects/spriteview/docs/studies/2026-08-29-migrating-to-harnez-release.md) | Retrospective on collapsing nine release Make targets into `harnez release` and rotating the minisign key. |
+
+## Case Studies
+
+**`docs/studies/`** — case studies, indexed by `harnez index`.
+
+| File | Topic |
+|------|-------|
+| [studies/2026-08-28-releasing-a-pure-python-project-with-goreleaser.md](studies/2026-08-28-releasing-a-pure-python-project-with-goreleaser.md) | Releasing a Pure-Python Project with GoReleaser |
+| [studies/2026-08-29-migrating-to-harnez-release.md](studies/2026-08-29-migrating-to-harnez-release.md) | Migrating to `harnez release` and Rotating the Signing Key |
+
+<!-- The table above is maintained by `harnez index`. -->

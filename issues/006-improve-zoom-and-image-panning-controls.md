@@ -1,13 +1,13 @@
 <!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-# 002 — Improve zoom and image panning controls
+# 006 — Improve zoom and image panning controls
 
 **Status**: Closed — resolved in 4e065bd
 **Priority**: P2 (Medium)
 **Severity**: Moderate
 **Category**: Feature
-**Related**: [Interactive crop feature](interactive_crop_feature.md), implementation commit `4e065bd`
+**Related**: [Interactive crop and save feature](002-interactive-crop-and-save-feature.md), implementation commit `4e065bd`
 
 ---
 

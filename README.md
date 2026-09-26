@@ -85,7 +85,8 @@ website/                project website (fully static)
 
 ```bash
 make test               # syntax check, unit tests, REUSE lint
-make install            # pack, install, restart Nautilus
+make install            # silent pack, install, restart Nautilus
+make full-install       # same workflow with full output
 make test-desktop       # validate installed .desktop entry and test gio launch
 make uninstall          # remove all installed files
 ```

@@ -1,13 +1,13 @@
 <!-- SPDX-FileCopyrightText: 2026 Uwe Jugel -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 
-# 003 — Left-button click selects pixels and drag starts crop
+# 007 — Left-button click selects pixels and drag starts crop
 
 **Status**: Closed — resolved in 53d81b3
 **Priority**: P2 (Medium)
 **Severity**: Moderate
 **Category**: Feature
-**Related**: [002 — Improve zoom and image panning controls](002-improve-zoom-and-image-panning-controls.md), [Interactive crop feature](interactive_crop_feature.md)
+**Related**: [006 — Improve zoom and image panning controls](006-improve-zoom-and-image-panning-controls.md), [002 — Interactive crop and save feature](002-interactive-crop-and-save-feature.md)
 
 ---
 
