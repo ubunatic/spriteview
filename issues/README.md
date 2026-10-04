@@ -16,6 +16,7 @@
 | 007 | [007-left-button-click-selects-pixels-and-drag-starts-crop.md](007-left-button-click-selects-pixels-and-drag-starts-crop.md) | Left-button click selects pixels and drag starts crop | Closed — resolved in 53d81b3 |
 | 008 | [008-crop-coordinates-follow-zoom-and-pan.md](008-crop-coordinates-follow-zoom-and-pan.md) | Crop coordinates follow zoom and pan | Open — manual zoom is incorrect when `scale_factor > 1` |
 | 009 | [009-separate-crop-coordinates-from-view-transforms.md](009-separate-crop-coordinates-from-view-transforms.md) | Separate crop coordinates from view transforms | Open |
+| 010 | [010-correct-stale-crop-issue-status-and-index.md](010-correct-stale-crop-issue-status-and-index.md) | Correct stale crop issue status and index | Open |
 
 ## Related Issue Records
 
