@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: 2026 Uwe Jugel
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# yaml-language-server: $schema=../spec/schemas/page.schema.json
+#
+# Content for ubunatic.com/spriteview. The project repo delivers this file
+# and its media under website/; make gen-tools renders the site-side index.html.
+
+title: SpriteView — pixel art and image previewer for Linux
+kicker: Linux image and sprite previewer
+title_lead: SpriteView
+title_main: crisp previews for pixel art and sprite sheets.
+lead: >-
+  A Linux image viewer for pixel artists and game developers. Inspect images at sharp zoom levels,
+  play sprite sheets as animations, read pixel colors, crop and export, or open files from GNOME Files.
+logo:
+  src: assets/banner.png
+  alt: SpriteView pixel-art banner
+cta_primary:
+  label: Install SpriteView
+  href: "#install"
+cta_secondary:
+  label: View source
+  href: https://codeberg.org/ubunatic/spriteview
+
+sections:
+  - id: why
+    tag: Why SpriteView
+    title: Inspect pixels without losing their edges
+    blocks:
+      - text: >-
+          General image viewers soften small artwork when enlarged and make sprite sheets awkward to
+          inspect. SpriteView is built for pixel-level review: it keeps scaling crisp, shows image
+          details and colors, and gives sprite animations and image sequences their own controls.
+      - video:
+          src: assets/spriteview-demo-001.webm
+          poster: assets/banner.png
+          label: SpriteView previewing pixel art and a sprite animation
+          caption: >-
+            A recorded tour of SpriteView's image preview, sprite-sheet playback and pixel inspection.
+
+  - id: gallery
+    tag: Screenshots
+    title: Image, sprite, color and settings views
+    blocks:
+      - gallery:
+          - title: Sprite-sheet preview
+            caption: Open a sheet from GNOME Files, inspect its frames, and play the animation.
+            images:
+              - src: assets/spriteview-screen-sheet-001.png
+                alt: GNOME Files folder showing individual sprite animation frames
+              - src: assets/spriteview-screen-sheet-002.png
+                alt: Selecting a sprite frame in GNOME Files
+              - src: assets/spriteview-screen-sheet-003.png
+                alt: GNOME Files context menu offering Preview Sprite Sheet
+              - src: assets/spriteview-screen-sheet-004.png
+                alt: SpriteView animation controller with playback controls
+          - title: Image preview
+            caption: Open an image and zoom while keeping pixel edges sharp.
+            images:
+              - src: assets/spriteview-screen-img-001.png
+                alt: Selecting an image asset in a GNOME Files folder
+              - src: assets/spriteview-screen-img-002.png
+                alt: GNOME Files context menu offering Preview Image
+              - src: assets/spriteview-screen-img-003.png
+                alt: SpriteView displaying a crisp nearest-neighbor enlarged image
+          - title: Color inspection and preferences
+            images:
+              - src: assets/spriteview-screen-color-info.png
+                alt: Color analyzer showing a palette, swatches and color names
+              - src: assets/spriteview-screen-settings.png
+                alt: SpriteView settings for playback, mode and sprite-sequence detection
+
+  - id: features
+    tag: Capabilities
+    title: Made for looking closely
+    blocks:
+      - cards:
+          - title: Crisp zoom and pan
+            text: Enlarge pixel art with nearest-neighbor scaling and navigate around the image.
+          - title: Sprite playback
+            text: Play sprite sheets, step through frames and inspect detected sequences.
+          - title: Pixel and palette details
+            text: Inspect image properties, sample pixel colors and review the dominant palette.
+          - title: Crop and export
+            text: Select image regions and export supported image and animation formats.
+          - title: GNOME Files integration
+            text: Open supported images from the file manager's context menu or use the standalone CLI.
+          - title: Persistent settings
+            text: Configure playback speed, preview mode and sequence detection preferences.
+
+  - id: install
+    tag: Quickstart
+    title: Install and start previewing
+    blocks:
+      - text: >-
+          Install the GNOME Files bindings for your distribution, then run the project installer.
+          Restart GNOME Files when installation completes.
+      - facts:
+          - key: Ubuntu / Debian
+            value: sudo apt install python3-nautilus
+          - key: Fedora
+            value: sudo dnf install nautilus-python
+      - shell: curl -sSL https://codeberg.org/ubunatic/spriteview/raw/branch/main/scripts/install.sh | bash
+      - text: >-
+          Right-click a supported image in GNOME Files and choose Preview Image or Preview Sprite
+          Sheet. The installed `spriteview` command can also preview files and sequences or export
+          them from a terminal; run `spriteview --help` for options.
+
+  - id: story
+    tag: Engineering story
+    title: Pixel precision and safe coordinates
+    blocks:
+      - text: >-
+          Read the [engineering story](https://codeberg.org/ubunatic/spriteview/src/branch/main/docs/studies/2026-10-04-pixel-art-preview-and-coordinate-safety-story.md)
+          about pixel-art previews and coordinate-safe image editing.

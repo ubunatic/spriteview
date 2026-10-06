@@ -4,7 +4,6 @@ version = 1
 path = [
     "sprites/**",
     "website/assets/**",
-    "website/favicon.png",
 ]
 SPDX-FileCopyrightText = "2026 Uwe Jugel"
 SPDX-License-Identifier = "AGPL-3.0-or-later"
@@ -14,21 +13,6 @@ path = ["**.md"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Uwe Jugel"
 SPDX-License-Identifier = "AGPL-3.0-or-later"
-
-[[annotations]]
-path = "website/assets/fonts/inter.woff2"
-SPDX-FileCopyrightText = "2016 The Inter Project Authors (https://github.com/rsms/inter)"
-SPDX-License-Identifier = "OFL-1.1"
-
-[[annotations]]
-path = "website/assets/fonts/sora.woff2"
-SPDX-FileCopyrightText = "2019 The Sora Project Authors (https://github.com/sora-xor/sora-font)"
-SPDX-License-Identifier = "OFL-1.1"
-
-[[annotations]]
-path = "website/assets/fonts/jetbrains-mono.woff2"
-SPDX-FileCopyrightText = "2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)"
-SPDX-License-Identifier = "OFL-1.1"
 
 [[annotations]]
 path = ["minisign.pub", "version.yaml"]
