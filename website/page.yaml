@@ -15,6 +15,7 @@ lead: >-
 logo:
   src: assets/banner.png
   alt: SpriteView pixel-art banner
+  pixelated: true
 cta_primary:
   label: Install SpriteView
   href: "#install"
@@ -33,7 +34,7 @@ sections:
           details and colors, and gives sprite animations and image sequences their own controls.
       - video:
           src: assets/spriteview-demo-001.webm
-          poster: assets/banner.png
+          poster: assets/spriteview-demo-poster.png
           label: SpriteView previewing pixel art and a sprite animation
           caption: >-
             A recorded tour of SpriteView's image preview, sprite-sheet playback and pixel inspection.
