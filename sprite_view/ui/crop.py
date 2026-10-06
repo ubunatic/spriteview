@@ -58,8 +58,13 @@ class CropManager:
             self.btn_overlay_crop.set_visible(self.crop_active)
 
     def _get_image_bounds(self, widget_w=None, widget_h=None):
+        if hasattr(self.win, "get_view_transform"):
+            transform = self.win.get_view_transform(widget_w, widget_h)
+            if transform is not None:
+                return transform
+
         win = self.win
-        if not win.textures or win.current_frame >= len(win.textures):
+        if not getattr(win, 'textures', None) or win.current_frame >= len(win.textures):
             return None
 
         if widget_w is None:
@@ -72,7 +77,10 @@ class CropManager:
         if pic_w <= 0 or pic_h <= 0:
             return None
 
-        # Picture position within the outer_overlay (where crop_overlay sits)
+        canvas_w, canvas_h = getattr(win, 'canvas_size', (0, 0))
+        if canvas_w <= 0 or canvas_h <= 0:
+            return None
+
         if pic_w <= widget_w:
             pic_x = (widget_w - pic_w) / 2
         else:
@@ -89,97 +97,82 @@ class CropManager:
             tex_w = tex.get_width()
             tex_h = tex.get_height()
             s = min(pic_w / tex_w, pic_h / tex_h) if pic_w > 0 else 1
+            scale_src_to_view = s * win.scale_factor
             canvas_to_texture_scale = win.scale_factor
-            img_w = tex_w * s
-            img_h = tex_h * s
-            x_offset = pic_x + (pic_w - img_w) / 2
-            y_offset = pic_y + (pic_h - img_h) / 2
         else:
-            # Manual zoom builds its paintable from the original source image,
-            # so source pixels map directly to the picture at the zoom scale.
-            s = win._zoom
+            scale_src_to_view = float(win._zoom)
             canvas_to_texture_scale = 1.0
-            img_w = pic_w
-            img_h = pic_h
-            x_offset = pic_x
-            y_offset = pic_y
 
-        return {
-            'x_min': x_offset,
-            'x_max': x_offset + img_w,
-            'y_min': y_offset,
-            'y_max': y_offset + img_h,
-            'w': img_w,
-            'h': img_h,
-            'scale': s,
-            'canvas_to_texture_scale': canvas_to_texture_scale,
-        }
+        from sprite_view.utils import ViewTransform
+        return ViewTransform(
+            x_min=pic_x,
+            y_min=pic_y,
+            scale_src_to_view=scale_src_to_view,
+            canvas_w=canvas_w,
+            canvas_h=canvas_h,
+            canvas_to_texture_scale=canvas_to_texture_scale,
+        )
 
     def _get_crop_box_widget_coords(self, bounds):
         if not self.crop_box:
             return 0.0, 0.0, 0.0, 0.0
-            
+
+        if hasattr(bounds, 'source_box_to_view'):
+            return bounds.source_box_to_view(self.crop_box)
+
         x1, y1, x2, y2 = self.crop_box
-        win = self.win
-        
-        # Map source-canvas pixels into the texture used in the active zoom mode.
-        canvas_scale = bounds['canvas_to_texture_scale']
-        tx1 = x1 * canvas_scale
-        ty1 = y1 * canvas_scale
-        tx2 = x2 * canvas_scale
-        ty2 = y2 * canvas_scale
-        
-        # Map texture -> widget
-        cx1 = bounds['x_min'] + tx1 * bounds['scale']
-        cy1 = bounds['y_min'] + ty1 * bounds['scale']
-        cx2 = bounds['x_min'] + tx2 * bounds['scale']
-        cy2 = bounds['y_min'] + ty2 * bounds['scale']
-        
-        cx_min = min(cx1, cx2)
-        cx_max = max(cx1, cx2)
-        cy_min = min(cy1, cy2)
-        cy_max = max(cy1, cy2)
-        
-        return cx_min, cy_min, cx_max, cy_max
+        canvas_scale = bounds.get('canvas_to_texture_scale', 1.0)
+        scale_src_to_view = bounds.get('scale_src_to_view', bounds['scale'] * canvas_scale)
+
+        cx1 = bounds['x_min'] + x1 * scale_src_to_view
+        cy1 = bounds['y_min'] + y1 * scale_src_to_view
+        cx2 = bounds['x_min'] + x2 * scale_src_to_view
+        cy2 = bounds['y_min'] + y2 * scale_src_to_view
+
+        return min(cx1, cx2), min(cy1, cy2), max(cx1, cx2), max(cy1, cy2)
 
     def _on_drag_begin(self, gesture, start_x, start_y) -> None:
         bounds = self._get_image_bounds()
         if not bounds:
             self.drag_in_progress = False
             return
-            
+
         win = self.win
         self.drag_start_widget = (start_x, start_y)
         self.previous_crop_active = self.crop_active
         self.previous_crop_box = self.crop_box
         self.click_outside_crop = False
-        
-        # Ignore gestures outside the image; image clicks still select pixels.
-        if start_x < bounds['x_min'] or start_x > bounds['x_max'] or start_y < bounds['y_min'] or start_y > bounds['y_max']:
-            self.drag_in_progress = False
-            return
-            
+
+        if hasattr(bounds, 'contains_view_point'):
+            if not bounds.contains_view_point(start_x, start_y):
+                self.drag_in_progress = False
+                return
+        else:
+            if start_x < bounds['x_min'] or start_x > bounds['x_max'] or start_y < bounds['y_min'] or start_y > bounds['y_max']:
+                self.drag_in_progress = False
+                return
+
         self.drag_in_progress = True
-        
-        # Convert start coordinates to canvas space and snap to source pixels
-        tx = (start_x - bounds['x_min']) / bounds['scale']
-        ty = (start_y - bounds['y_min']) / bounds['scale']
-        canvas_scale = bounds['canvas_to_texture_scale']
-        cx = int(round(tx / canvas_scale))
-        cy = int(round(ty / canvas_scale))
-        
-        canvas_w, canvas_h = win.canvas_size
-        cx = max(0, min(canvas_w, cx))
-        cy = max(0, min(canvas_h, cy))
+
+        if hasattr(bounds, 'view_to_source_pixel'):
+            cx, cy = bounds.view_to_source_pixel(start_x, start_y, clamp=True)
+        else:
+            tx = (start_x - bounds['x_min']) / bounds['scale']
+            ty = (start_y - bounds['y_min']) / bounds['scale']
+            canvas_scale = bounds.get('canvas_to_texture_scale', 1.0)
+            cx = int(round(tx / canvas_scale))
+            cy = int(round(ty / canvas_scale))
+            canvas_w, canvas_h = win.canvas_size
+            cx = max(0, min(canvas_w, cx))
+            cy = max(0, min(canvas_h, cy))
 
         if self.crop_active and self.crop_box:
             x1, y1, x2, y2 = self._get_crop_box_widget_coords(bounds)
             self.click_outside_crop = not (x1 <= start_x <= x2 and y1 <= start_y <= y2)
-        
+
         self.drag_handle = None
         self.move_mode = False
-        
-        # Check if clicking on/near a handle first
+
         if self.crop_active and self.crop_box and not self.click_outside_crop:
             cx1, cy1, cx2, cy2 = self._get_crop_box_widget_coords(bounds)
             handles = {
@@ -192,7 +185,7 @@ class CropManager:
                 'LC': (cx1, (cy1 + cy2)/2),
                 'RC': (cx2, (cy1 + cy2)/2)
             }
-            
+
             closest_handle = None
             min_dist = float('inf')
             for name, (hx, hy) in handles.items():
@@ -200,19 +193,17 @@ class CropManager:
                 if dist < min_dist:
                     min_dist = dist
                     closest_handle = name
-                    
-            if min_dist <= 18.0:  # 18 pixels hit target
+
+            if min_dist <= 18.0:
                 self.drag_handle = closest_handle
                 self.initial_crop_box = self.crop_box
-                
-        # If not clicking a handle, check if clicking inside the box
+
         if not self.drag_handle and not self.click_outside_crop and self.crop_active and self.crop_box:
             bx1, by1, bx2, by2 = self.crop_box
             if bx1 <= cx <= bx2 and by1 <= cy <= by2:
                 self.move_mode = True
                 self.initial_crop_box = (bx1, by1, bx2, by2)
-                
-        # If neither, start drawing a new crop box
+
         if not self.drag_handle and not self.move_mode:
             self.pending_new_crop = True
             self.crop_drag_start = (cx, cy)
@@ -224,19 +215,22 @@ class CropManager:
     def _on_drag_update(self, gesture, offset_x, offset_y) -> None:
         if not hasattr(self, 'drag_in_progress') or not self.drag_in_progress:
             return
-            
+
         bounds = self._get_image_bounds()
         if not bounds:
             return
-            
-        win = self.win
-        # Map offset to canvas space and snap to source pixels
-        canvas_scale = bounds['canvas_to_texture_scale']
-        offset_cx = int(round((offset_x / bounds['scale']) / canvas_scale))
-        offset_cy = int(round((offset_y / bounds['scale']) / canvas_scale))
 
-        # A GestureDrag starts on mouse-down. Wait for a real drag before
-        # showing crop UI, so a click used to sample a color never flashes it.
+        win = self.win
+        if hasattr(bounds, 'view_delta_to_source'):
+            delta_cx, delta_cy = bounds.view_delta_to_source(offset_x, offset_y)
+        else:
+            canvas_scale = bounds.get('canvas_to_texture_scale', 1.0)
+            delta_cx = (offset_x / bounds['scale']) / canvas_scale
+            delta_cy = (offset_y / bounds['scale']) / canvas_scale
+
+        offset_cx = int(round(delta_cx))
+        offset_cy = int(round(delta_cy))
+
         if getattr(self, 'pending_new_crop', False):
             if abs(offset_x) < 5.0 and abs(offset_y) < 5.0:
                 return
@@ -245,14 +239,14 @@ class CropManager:
             self.crop_box = (start_cx, start_cy, start_cx, start_cy)
             self.pending_new_crop = False
             self._update_crop_button_visibility()
-        
+
         canvas_w, canvas_h = win.canvas_size
-        
+
         if getattr(self, 'drag_handle', None):
             bx1, by1, bx2, by2 = self.initial_crop_box
             x1, y1, x2, y2 = bx1, by1, bx2, by2
             h = self.drag_handle
-            
+
             if h in ('TL', 'BL', 'LC'):
                 x1 = max(0, min(x2 - 1, bx1 + offset_cx))
             if h in ('TR', 'BR', 'RC'):
@@ -261,34 +255,32 @@ class CropManager:
                 y1 = max(0, min(y2 - 1, by1 + offset_cy))
             if h in ('BL', 'BR', 'BC'):
                 y2 = max(y1 + 1, min(canvas_h, by2 + offset_cy))
-                
+
             self.crop_box = (x1, y1, x2, y2)
         elif getattr(self, 'move_mode', False):
             bx1, by1, bx2, by2 = self.initial_crop_box
             box_w = bx2 - bx1
             box_h = by2 - by1
-            
-            # Shift the box
+
             new_x1 = bx1 + offset_cx
             new_y1 = by1 + offset_cy
-            
-            # Clamp box to canvas boundaries
+
             new_x1 = max(0, min(canvas_w - box_w, new_x1))
             new_y1 = max(0, min(canvas_h - box_h, new_y1))
-            
+
             self.crop_box = (new_x1, new_y1, new_x1 + box_w, new_y1 + box_h)
         else:
             start_cx, start_cy = self.crop_drag_start
             curr_cx = max(0, min(canvas_w, start_cx + offset_cx))
             curr_cy = max(0, min(canvas_h, start_cy + offset_cy))
-            
+
             self.crop_box = (
                 min(start_cx, curr_cx),
                 min(start_cy, curr_cy),
                 max(start_cx, curr_cx),
                 max(start_cy, curr_cy)
             )
-            
+
         self.crop_overlay.queue_draw()
 
     def _on_drag_end(self, gesture, offset_x, offset_y) -> None:
@@ -298,15 +290,14 @@ class CropManager:
                 self.win._on_picture_clicked(gesture, 1, start_x, start_y)
             return
         self.drag_in_progress = False
-        
+
         bounds = self._get_image_bounds()
         if not bounds:
             return
-            
-        # Check if the drag offset is small (indicating a simple click)
+
         is_click = abs(offset_x) < 5.0 and abs(offset_y) < 5.0
         self.pending_new_crop = False
-        
+
         if is_click:
             if self.click_outside_crop:
                 self.reset()
@@ -316,13 +307,12 @@ class CropManager:
             start_x, start_y = self.drag_start_widget
             self.win._on_picture_clicked(gesture, 1, start_x, start_y)
         else:
-            # If in draw mode (not drag_handle and not move_mode), check if too small
             if not getattr(self, 'drag_handle', None) and not getattr(self, 'move_mode', False):
                 if self.crop_box:
                     x1, y1, x2, y2 = self.crop_box
                     if abs(x2 - x1) < 2 and abs(y2 - y1) < 2:
                         self.reset()
-                        
+
         self.drag_handle = None
         self.move_mode = False
         self.click_outside_crop = False
@@ -332,67 +322,57 @@ class CropManager:
     def _on_crop_overlay_draw(self, area, cr, w, h) -> None:
         if not self.crop_active or not self.crop_box:
             return
-            
+
         bounds = self._get_image_bounds(w, h)
         if not bounds:
             return
-            
+
         x_min = bounds['x_min']
         x_max = bounds['x_max']
         y_min = bounds['y_min']
         y_max = bounds['y_max']
         img_w = bounds['w']
         img_h = bounds['h']
-        
-        # Get crop box widget coordinates
+
         cx1, cy1, cx2, cy2 = self._get_crop_box_widget_coords(bounds)
-        
-        # Ensure we only draw within the actual image bounds
+
         cx1 = max(x_min, min(x_max, cx1))
         cx2 = max(x_min, min(x_max, cx2))
         cy1 = max(y_min, min(y_max, cy1))
         cy2 = max(y_min, min(y_max, cy2))
-        
+
         if cx1 == cx2 or cy1 == cy2:
             return
-            
-        # Draw the dimmed background outside the crop box (clamped to image bounds)
+
         cr.save()
-        cr.set_source_rgba(0.0, 0.0, 0.0, 0.5) # 50% opacity black
-        
-        # Top
+        cr.set_source_rgba(0.0, 0.0, 0.0, 0.5)
+
         if cy1 > y_min:
             cr.rectangle(x_min, y_min, img_w, cy1 - y_min)
             cr.fill()
-        # Bottom
         if y_max > cy2:
             cr.rectangle(x_min, cy2, img_w, y_max - cy2)
             cr.fill()
-        # Left
         if cx1 > x_min:
             cr.rectangle(x_min, cy1, cx1 - x_min, cy2 - cy1)
             cr.fill()
-        # Right
         if x_max > cx2:
             cr.rectangle(cx2, cy1, x_max - cx2, cy2 - cy1)
             cr.fill()
-            
-        # Draw outer black border for contrast
+
         cr.set_source_rgba(0.0, 0.0, 0.0, 0.8)
         cr.set_line_width(2.0)
         cr.rectangle(cx1, cy1, cx2 - cx1, cy2 - cy1)
         cr.stroke()
-        
-        # Draw inner white dashed border
+
         cr.set_source_rgba(1.0, 1.0, 1.0, 0.9)
         cr.set_line_width(1.0)
         cr.set_dash([4.0, 4.0], 0.0)
         cr.rectangle(cx1, cy1, cx2 - cx1, cy2 - cy1)
         cr.stroke()
-        
+
         cr.set_dash([], 0.0)
-        
-        # Draw handles at corners and edges
+
         handle_size = 12.0
         handles = [
             (cx1, cy1), (cx2, cy1), (cx1, cy2), (cx2, cy2),
@@ -401,54 +381,40 @@ class CropManager:
         ]
         cr.set_line_width(1.0)
         for hx, hy in handles:
-            # Black border
             cr.set_source_rgb(0.0, 0.0, 0.0)
             cr.rectangle(hx - handle_size/2, hy - handle_size/2, handle_size, handle_size)
             cr.fill()
-            # White inner
             cr.set_source_rgb(1.0, 1.0, 1.0)
             cr.rectangle(hx - handle_size/2 + 1, hy - handle_size/2 + 1, handle_size - 2, handle_size - 2)
             cr.fill()
-            
-        # Show size text centered on top/inside the crop box
-        win = self.win
-        tx1 = (cx1 - bounds['x_min']) / bounds['scale']
-        ty1 = (cy1 - bounds['y_min']) / bounds['scale']
-        tx2 = (cx2 - bounds['x_min']) / bounds['scale']
-        ty2 = (cy2 - bounds['y_min']) / bounds['scale']
-        
-        canvas_scale = bounds['canvas_to_texture_scale']
-        ox1 = tx1 / canvas_scale
-        oy1 = ty1 / canvas_scale
-        ox2 = tx2 / canvas_scale
-        oy2 = ty2 / canvas_scale
-        
-        crop_w = int(round(abs(ox2 - ox1)))
-        crop_h = int(round(abs(oy2 - oy1)))
-        
+
+        bx1, by1, bx2, by2 = self.crop_box
+        crop_w = int(round(abs(bx2 - bx1)))
+        crop_h = int(round(abs(by2 - by1)))
+
         size_str = f"{crop_w} × {crop_h}"
-        
-        cr.select_font_face("Sans", 0, 1) # font face, slant, weight (1 = Bold)
+
+        cr.select_font_face("Sans", 0, 1)
         cr.set_font_size(12.0)
-        
+
         _, _, text_w, text_h, _, _ = cr.text_extents(size_str)
-        
+
         pill_w = text_w + 12.0
         pill_h = text_h + 8.0
-        
+
         px = (cx1 + cx2)/2 - pill_w/2
         py = cy1 - pill_h - 6.0
         if py < bounds['y_min']:
             py = cy1 + 6.0
-            
+
         cr.set_source_rgba(0.0, 0.0, 0.0, 0.7)
         cr.rectangle(px, py, pill_w, pill_h)
         cr.fill()
-        
+
         cr.set_source_rgb(1.0, 1.0, 1.0)
         cr.move_to(px + 6.0, py + pill_h - 5.0)
         cr.show_text(size_str)
-        
+
         cr.restore()
 
     def crop_in_memory(self) -> None:
