@@ -194,3 +194,125 @@ def get_short_hex(r: int, g: int, b: int) -> str:
     if (r % 17 == 0) and (g % 17 == 0) and (b % 17 == 0):
         return f"#{r//17:x}{g//17:x}{b//17:x}"
     return hex_long
+
+
+class ViewTransform:
+    """Explicit coordinate transform between natural-resolution source image space
+    and displayed widget view space."""
+
+    def __init__(
+        self,
+        x_min: float,
+        y_min: float,
+        scale_src_to_view: float,
+        canvas_w: int,
+        canvas_h: int,
+        canvas_to_texture_scale: float = 1.0,
+    ) -> None:
+        self.x_min = float(x_min)
+        self.y_min = float(y_min)
+        self.scale_src_to_view = float(scale_src_to_view)
+        self.canvas_w = int(canvas_w)
+        self.canvas_h = int(canvas_h)
+        self.canvas_to_texture_scale = float(canvas_to_texture_scale)
+
+    @property
+    def x_max(self) -> float:
+        return self.x_min + self.canvas_w * self.scale_src_to_view
+
+    @property
+    def y_max(self) -> float:
+        return self.y_min + self.canvas_h * self.scale_src_to_view
+
+    @property
+    def view_w(self) -> float:
+        return self.canvas_w * self.scale_src_to_view
+
+    @property
+    def view_h(self) -> float:
+        return self.canvas_h * self.scale_src_to_view
+
+    @property
+    def scale(self) -> float:
+        """Texture-to-widget scale for backward compatibility with legacy tests."""
+        if self.canvas_to_texture_scale > 0:
+            return self.scale_src_to_view / self.canvas_to_texture_scale
+        return self.scale_src_to_view
+
+    def source_to_view(self, src_x: float, src_y: float) -> tuple[float, float]:
+        """Convert source coordinate (src_x, src_y) to view coordinate."""
+        view_x = self.x_min + src_x * self.scale_src_to_view
+        view_y = self.y_min + src_y * self.scale_src_to_view
+        return view_x, view_y
+
+    def source_box_to_view(
+        self, box: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        """Convert source crop box (x1, y1, x2, y2) to view rectangle (vx1, vy1, vx2, vy2)."""
+        if not box:
+            return 0.0, 0.0, 0.0, 0.0
+        x1, y1, x2, y2 = box
+        vx1, vy1 = self.source_to_view(x1, y1)
+        vx2, vy2 = self.source_to_view(x2, y2)
+        return min(vx1, vx2), min(vy1, vy2), max(vx1, vx2), max(vy1, vy2)
+
+    def view_to_source(self, view_x: float, view_y: float) -> tuple[float, float]:
+        """Convert view coordinate (view_x, view_y) to float source coordinate."""
+        if self.scale_src_to_view == 0:
+            return 0.0, 0.0
+        src_x = (view_x - self.x_min) / self.scale_src_to_view
+        src_y = (view_y - self.y_min) / self.scale_src_to_view
+        return src_x, src_y
+
+    def view_to_source_pixel(
+        self, view_x: float, view_y: float, clamp: bool = True
+    ) -> tuple[int, int]:
+        """Convert view coordinate to discrete integer source pixel coordinate."""
+        src_x, src_y = self.view_to_source(view_x, view_y)
+        px = int(round(src_x))
+        py = int(round(src_y))
+        if clamp:
+            px = max(0, min(self.canvas_w, px))
+            py = max(0, min(self.canvas_h, py))
+        return px, py
+
+    def view_delta_to_source(
+        self, delta_view_x: float, delta_view_y: float
+    ) -> tuple[float, float]:
+        """Convert view coordinate delta/offset to source coordinate delta."""
+        if self.scale_src_to_view == 0:
+            return 0.0, 0.0
+        return (
+            delta_view_x / self.scale_src_to_view,
+            delta_view_y / self.scale_src_to_view,
+        )
+
+    def contains_view_point(self, view_x: float, view_y: float) -> bool:
+        """Check if a view point falls within rendered canvas bounds in view space."""
+        return (
+            self.x_min <= view_x <= self.x_max
+            and self.y_min <= view_y <= self.y_max
+        )
+
+    def __getitem__(self, item: str):
+        """Dict-style access for backward compatibility with existing tests/mocks."""
+        d = {
+            'x_min': self.x_min,
+            'x_max': self.x_max,
+            'y_min': self.y_min,
+            'y_max': self.y_max,
+            'w': self.view_w,
+            'h': self.view_h,
+            'scale': self.scale,
+            'scale_src_to_view': self.scale_src_to_view,
+            'canvas_to_texture_scale': self.canvas_to_texture_scale,
+        }
+        if item in d:
+            return d[item]
+        raise KeyError(item)
+
+    def get(self, item: str, default=None):
+        try:
+            return self[item]
+        except KeyError:
+            return default

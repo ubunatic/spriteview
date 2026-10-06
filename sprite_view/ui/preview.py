@@ -16,7 +16,7 @@ from typing import List
 from collections import Counter
 from PIL import Image
 
-from sprite_view.utils import format_size, rgb_to_ansi, get_short_hex
+from sprite_view.utils import format_size, rgb_to_ansi, get_short_hex, ViewTransform
 from sprite_view.settings import load_settings, save_settings
 from sprite_view.ui.about import AboutWindow
 from sprite_view.ui.settings import SettingsWindow
@@ -595,6 +595,68 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         if is_sequence or is_standalone_png:
             self.btn_sidebar.set_active(is_sequence)
 
+    def get_view_transform(self, widget_w=None, widget_h=None) -> ViewTransform | None:
+        """Compute and return the explicit ViewTransform boundary for the current image and view state."""
+        if not self.textures or self.current_frame >= len(self.textures):
+            return None
+
+        if widget_w is None or widget_h is None:
+            if hasattr(self, 'crop_manager') and hasattr(self.crop_manager, 'crop_overlay'):
+                widget_w = self.crop_manager.crop_overlay.get_width()
+                widget_h = self.crop_manager.crop_overlay.get_height()
+            else:
+                widget_w = self.outer_overlay.get_width()
+                widget_h = self.outer_overlay.get_height()
+
+        pic_w = self.picture.get_width()
+        pic_h = self.picture.get_height()
+        if pic_w <= 0 or pic_h <= 0:
+            return None
+
+        canvas_w, canvas_h = self.canvas_size
+        if canvas_w <= 0 or canvas_h <= 0:
+            return None
+
+        if pic_w <= widget_w:
+            pic_x = (widget_w - pic_w) / 2
+        else:
+            hadj = self.scroll_zoom.get_hadjustment()
+            pic_x = -(hadj.get_value() if hadj else 0)
+
+        if pic_h <= widget_h:
+            pic_y = (widget_h - pic_h) / 2
+        else:
+            vadj = self.scroll_zoom.get_vadjustment()
+            pic_y = -(vadj.get_value() if vadj else 0)
+
+        if self._zoom == 0:
+            tex = self.textures[self.current_frame]
+            tex_w = tex.get_width()
+            tex_h = tex.get_height()
+            s = min(pic_w / tex_w, pic_h / tex_h) if pic_w > 0 and tex_w > 0 else 1.0
+            scale_src_to_view = s * self.scale_factor
+            img_w = tex_w * s
+            img_h = tex_h * s
+            x_min = pic_x + (pic_w - img_w) / 2
+            y_min = pic_y + (pic_h - img_h) / 2
+            canvas_to_texture_scale = self.scale_factor
+        else:
+            scale_src_to_view = float(self._zoom)
+            img_w = pic_w
+            img_h = pic_h
+            x_min = pic_x
+            y_min = pic_y
+            canvas_to_texture_scale = 1.0
+
+        return ViewTransform(
+            x_min=x_min,
+            y_min=y_min,
+            scale_src_to_view=scale_src_to_view,
+            canvas_w=canvas_w,
+            canvas_h=canvas_h,
+            canvas_to_texture_scale=canvas_to_texture_scale,
+        )
+
     def _get_picture_viewport_bounds(self):
         """Return dict with picture's position and visible size within the outer overlay."""
         pic_w = self.picture.get_width()
@@ -697,23 +759,10 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
 
     def _get_source_pixel_at_screen(self, sx, sy):
         """Convert screen coordinates to source image pixel coordinates."""
-        if self._zoom == 0:
-            w = self.picture.get_width()
-            h = self.picture.get_height()
-            src = self._source_pixbufs[self.current_frame]
-            sw, sh = src.get_width(), src.get_height()
-            effective = min(w / sw, h / sh) if w > 0 and h > 0 else 1.0
-            disp_w = sw * effective
-            disp_h = sh * effective
-            img_x = (w - disp_w) / 2
-            img_y = (h - disp_h) / 2
-            px = (sx - img_x) / effective
-            py = (sy - img_y) / effective
-        else:
-            bounds = self._get_picture_viewport_bounds()
-            px = (sx - bounds['pic_x']) / self._zoom
-            py = (sy - bounds['pic_y']) / self._zoom
-        return px, py
+        transform = self.get_view_transform()
+        if transform is None:
+            return 0.0, 0.0
+        return transform.view_to_source(sx, sy)
 
     def _adjust_scroll_for_zoom(self, src_x, src_y, screen_x, screen_y) -> None:
         """After zoom change, adjust scroll so source pixel stays at (screen_x, screen_y)."""
@@ -1319,48 +1368,15 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
         if self.current_frame >= len(self.original_pixbufs):
             return
 
+        transform = self.get_view_transform()
+        if transform is None or not transform.contains_view_point(x, y):
+            return
+
         pixbuf = self.original_pixbufs[self.current_frame]
         src_w = pixbuf.get_width()
         src_h = pixbuf.get_height()
 
-        paintable = self.picture.get_paintable()
-        if not paintable:
-            return
-
-        tex_w = paintable.get_intrinsic_width()
-        tex_h = paintable.get_intrinsic_height()
-
-        alloc = self.picture.get_allocation()
-        w = alloc.width
-        h = alloc.height
-
-        if tex_w <= 0 or tex_h <= 0 or w <= 0 or h <= 0:
-            return
-
-        if self._zoom == 0:
-            scale = min(w / tex_w, h / tex_h)
-            draw_w = tex_w * scale
-            draw_h = tex_h * scale
-            sf = self.scale_factor
-        else:
-            scale = 1.0
-            draw_w = tex_w
-            draw_h = tex_h
-            sf = self._zoom
-
-        draw_x = (w - draw_w) / 2
-        draw_y = (h - draw_h) / 2
-
-        # x,y are in outer_overlay coords -> convert to picture coords
-        b = self._get_picture_viewport_bounds()
-        px_in_pic = x - b['pic_x']
-        py_in_pic = y - b['pic_y']
-
-        if px_in_pic < draw_x or px_in_pic >= draw_x + draw_w or py_in_pic < draw_y or py_in_pic >= draw_y + draw_h:
-            return
-
-        tex_x = (px_in_pic - draw_x) / scale
-        tex_y = (py_in_pic - draw_y) / scale
+        cx, cy = transform.view_to_source_pixel(x, y, clamp=False)
 
         if self.has_mixed_sizes:
             canvas_w, canvas_h = self.canvas_size
@@ -1368,14 +1384,13 @@ class ImagePreviewWindow(Gtk.ApplicationWindow):
             row, col = self.current_align // 3, self.current_align % 3
             dx = (canvas_w - raw_w) * col // 2
             dy = (canvas_h - raw_h) * row // 2
-            px = int(tex_x / sf - dx)
-            py = int(tex_y / sf - dy)
+            px = cx - dx
+            py = cy - dy
         else:
-            px = int(tex_x / sf)
-            py = int(tex_y / sf)
+            px, py = cx, cy
 
-        px = max(0, min(src_w - 1, px))
-        py = max(0, min(src_h - 1, py))
+        if px < 0 or px >= src_w or py < 0 or py >= src_h:
+            return
 
         pixels = pixbuf.get_pixels()
         n_channels = pixbuf.get_n_channels()

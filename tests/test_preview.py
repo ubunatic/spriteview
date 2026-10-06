@@ -290,7 +290,7 @@ class TestImagePreviewWindow(unittest.TestCase):
 
     def test_crop_drag_coordinates_follow_zoom_and_pan(self):
         from sprite_view.ui.crop import CropManager
-        win = MagicMock(spec=ImagePreviewWindow)
+        win = MagicMock()
         win.textures = [MagicMock()]
         win.current_frame = 0
         win.picture = MagicMock()
@@ -300,6 +300,7 @@ class TestImagePreviewWindow(unittest.TestCase):
         win.scroll_zoom.get_hadjustment.return_value.get_value.return_value = 80
         win.scroll_zoom.get_vadjustment.return_value.get_value.return_value = 30
         win.canvas_size = (300, 200)
+        win.get_view_transform = lambda widget_w=None, widget_h=None: ImagePreviewWindow.get_view_transform(win, widget_w, widget_h)
         manager = CropManager(win)
 
         get_bounds = manager._get_image_bounds
@@ -343,7 +344,7 @@ class TestImagePreviewWindow(unittest.TestCase):
         win._on_picture_clicked.assert_called_once_with(None, 1, 12.0, 18.0)
 
     def test_picture_click_selects_pixel_color(self):
-        win = MagicMock(spec=ImagePreviewWindow)
+        win = MagicMock()
         win.current_frame = 0
         pixbuf = MagicMock()
         pixbuf.get_width.return_value = 2
@@ -352,19 +353,20 @@ class TestImagePreviewWindow(unittest.TestCase):
         pixbuf.get_n_channels.return_value = 4
         pixbuf.get_rowstride.return_value = 8
         win.original_pixbufs = [pixbuf]
+        win.textures = [MagicMock()]
+        win.textures[0].get_width.return_value = 2
+        win.textures[0].get_height.return_value = 2
         win.picture = MagicMock()
-        paintable = MagicMock()
-        paintable.get_intrinsic_width.return_value = 2
-        paintable.get_intrinsic_height.return_value = 2
-        win.picture.get_paintable.return_value = paintable
         win.picture.get_width.return_value = 2
         win.picture.get_height.return_value = 2
-        win.picture.get_allocation.return_value.width = 2
-        win.picture.get_allocation.return_value.height = 2
+        win.canvas_size = (2, 2)
         win._zoom = 0
         win.scale_factor = 1
         win.has_mixed_sizes = False
-        win._get_picture_viewport_bounds.return_value = {"pic_x": 0, "pic_y": 0}
+        win.crop_manager = MagicMock()
+        win.crop_manager.crop_overlay.get_width.return_value = 2
+        win.crop_manager.crop_overlay.get_height.return_value = 2
+        win.get_view_transform = lambda widget_w=None, widget_h=None: ImagePreviewWindow.get_view_transform(win, widget_w, widget_h)
         win._update_selected_color_ui = MagicMock()
         win._select_palette_entry = MagicMock()
 
